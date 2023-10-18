@@ -5,6 +5,10 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[lib]
+name = "fstp"
+path = "src/fstp/mod.rs"
+
 [[bin]]
 name = "tracker"
 path = "src/tracker.rs"
@@ -16,3 +20,4 @@ path = "src/node.rs"
 
 [dependencies]
 anyhow = "1.0.75"
+serde = "1.0.189"

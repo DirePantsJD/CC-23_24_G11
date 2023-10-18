@@ -1,14 +1,22 @@
 use anyhow::Context;
+use fstp::*;
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::str::from_utf8;
 
 fn main() -> anyhow::Result<()> {
-    let mut buffer = [0 as u8; 50];
+    let data = [0u8; 50];
+    let mut buffer = [0u8; 50];
     let mut stream = TcpStream::connect("127.0.0.1:9090")
         .context("Can't connect to server")?;
+    let msg = FstpMessage {
+        header: fstp::FstpHeader { val: Val::Add },
+        data: &data,
+    };
 
-    stream.write("Hey *winks*".as_bytes())?;
+    msg.to_bytes(&mut buffer);
+
+    stream.write(&buffer)?;
 
     while stream.read(&mut buffer)? == 0 {}
 
