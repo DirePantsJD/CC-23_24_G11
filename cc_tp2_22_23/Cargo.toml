@@ -7,7 +7,7 @@ edition = "2021"
 
 [lib]
 name = "fstp"
-path = "src/fstp/mod.rs"
+path = "src/fstp.rs"
 
 [[bin]]
 name = "tracker"
@@ -20,4 +20,3 @@ path = "src/node.rs"
 
 [dependencies]
 anyhow = "1.0.75"
-serde = "1.0.189"
