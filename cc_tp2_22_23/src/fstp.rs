@@ -10,11 +10,11 @@ pub struct FstpMessage<'a> {
 
 #[derive(Debug)]
 pub struct FstpHeader {
-    pub val: Val,
+    pub flag: Flag,
 }
 
 #[derive(Debug)]
-pub enum Val {
+pub enum Flag {
     Ok,
     Add,
     List,
@@ -25,20 +25,21 @@ pub enum Val {
 
 impl<'a> FstpMessage<'a> {
     pub fn to_bytes(self, buf: &mut [u8]) {
-        let val = &self.header.val;
-        val.to_bytes_val(buf);
+        let flag = &self.header.flag;
+        flag.to_bytes_flag(buf);
     }
     pub fn from_bytes(bytes: &[u8]) -> anyhow::Result<FstpMessage> {
-        let val = Val::from_bytes_val(bytes.first().expect("Empty message"))?;
+        let flag =
+            Flag::from_bytes_flag(bytes.first().expect("Empty message"))?;
         Ok(FstpMessage {
-            header: FstpHeader { val },
+            header: FstpHeader { flag },
             data: &[0u8],
         }) // return implicito
     }
 }
 
-impl Val {
-    fn to_bytes_val(&self, buf: &mut [u8]) {
+impl Flag {
+    fn to_bytes_flag(&self, buf: &mut [u8]) {
         let mut i: u8 = 0;
         match self {
             Self::Ok => {}
@@ -51,15 +52,15 @@ impl Val {
         buf[0] = i;
     }
 
-    fn from_bytes_val(byte: &u8) -> anyhow::Result<Val> {
+    fn from_bytes_flag(byte: &u8) -> anyhow::Result<Flag> {
         match byte {
             0 => Ok(Self::Ok),
-            1 => Ok(Val::Add),
-            2 => Ok(Val::List),
-            3 => Ok(Val::File),
-            4 => Ok(Val::Start),
-            5 => Ok(Val::End),
-            _ => bail!("Val inválido"),
+            1 => Ok(Flag::Add),
+            2 => Ok(Flag::List),
+            3 => Ok(Flag::File),
+            4 => Ok(Flag::Start),
+            5 => Ok(Flag::End),
+            _ => bail!("Flag inválido"),
         }
     }
 }

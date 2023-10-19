@@ -10,7 +10,7 @@ fn main() -> anyhow::Result<()> {
     let mut stream = TcpStream::connect("127.0.0.1:9090")
         .context("Can't connect to server")?;
     let msg = FstpMessage {
-        header: fstp::FstpHeader { val: Val::Add },
+        header: fstp::FstpHeader { flag: Flag::Add },
         data: &data,
     };
 
