@@ -21,6 +21,7 @@ pub enum Flag {
     File,
     Start,
     End,
+    Exit,
 }
 
 impl<'a> FstpMessage<'a> {
@@ -48,6 +49,7 @@ impl Flag {
             Self::File => i = 3u8,
             Self::Start => i = 4u8,
             Self::End => i = 5u8,
+            Self::Exit => i = 6u8,
         }
         buf[0] = i;
     }
@@ -60,6 +62,7 @@ impl Flag {
             3 => Ok(Flag::File),
             4 => Ok(Flag::Start),
             5 => Ok(Flag::End),
+            6 => Ok(Flag::Exit),
             _ => bail!("Flag inválido"),
         }
     }
