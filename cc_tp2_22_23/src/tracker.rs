@@ -24,8 +24,18 @@ fn main() -> anyhow::Result<()> {
 fn handler(stream: &mut TcpStream) -> anyhow::Result<()> {
     let mut buffer = [0 as u8; 50];
     while stream.read(&mut buffer)? == 0 {}
+    let msg = FstpMessage::from_bytes(&buffer)?;
+    println!("{:?}", &msg);
 
-    println!("{:?}", FstpMessage::from_bytes(&buffer)?);
+    match msg.header.flag {
+        Flag::Ok => {} //Em principio não deve de acontecer
+        Flag::Add => {}
+        Flag::List => {}
+        Flag::File => {}
+        Flag::Start => {}
+        Flag::End => {}
+        Flag::Exit => {}
+    }
 
     stream
         .write("Hey *blushes*".as_bytes())

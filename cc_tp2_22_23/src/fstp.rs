@@ -5,7 +5,7 @@ use anyhow::bail;
 #[derive(Debug)]
 pub struct FstpMessage<'a> {
     pub header: FstpHeader,
-    pub data: &'a [u8],
+    pub data: Option<&'a [u8]>,
 }
 
 #[derive(Debug)]
@@ -34,7 +34,7 @@ impl<'a> FstpMessage<'a> {
             Flag::from_bytes_flag(bytes.first().expect("Empty message"))?;
         Ok(FstpMessage {
             header: FstpHeader { flag },
-            data: &[0u8],
+            data: None, // tmp. Depois muda para => Some(data)
         }) // return implicito
     }
 }
