@@ -21,6 +21,7 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+// Pega na conexao
 fn handler(stream: &mut TcpStream) -> anyhow::Result<()> {
     let mut buffer = [0 as u8; 50];
     while stream.read(&mut buffer)? == 0 {}
