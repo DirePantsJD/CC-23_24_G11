@@ -22,12 +22,12 @@ fn main() -> anyhow::Result<()> {
 fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
     let mut peers_files: HashMap<IpAddr,Vec<String>> = HashMap::new();
     loop {
-        let mut command = String::new();
+        let mut raw_command = String::new();
         stdout().write_all("Input command\n".as_bytes())?;
         stdout().flush()?;
-        stdin().read_line(&mut command)?;
-
-        match command.to_lowercase().trim_end() {
+        stdin().read_line(&mut raw_command)?;
+        let command = String::from(raw_command.to_lowercase().trim_end());
+        match command.as_str() {
             "list" => {
                 let mut buf = [0u8;100];
                 let msg = FstpMessage{
@@ -71,7 +71,7 @@ fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
             "exit" => {
                 stream.shutdown(std::net::Shutdown::Both)?;
             }
-            _=> {}
+            _=> println!("Invalid command: {}",command),
         }
     }
 }
