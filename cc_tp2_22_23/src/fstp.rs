@@ -11,6 +11,7 @@ pub struct FstpMessage<'a> {
 #[derive(Debug)]
 pub struct FstpHeader {
     pub flag: Flag,
+    // pub data_size: u16,
 }
 
 #[derive(Debug)]
@@ -23,50 +24,53 @@ pub enum Flag {
 }
 
 impl<'a> FstpMessage<'a> {
-    pub fn put_in_bytes(self, buf: &mut Vec<u8>) -> anyhow::Result<()> {
+    pub fn put_in_bytes(self, buf: &mut [u8]) -> anyhow::Result<()> {
         let flag = &self.header.flag;
-        flag.to_bytes_flag(buf);
+        buf[0] = flag.to_bytes_flag();
         if let Some(data) = self.data {
-            buf.extend_from_slice(&data);
+            for i in 0..data.len() {
+                buf[i + 1] = data[i];
+            }
+            buf[data.len() + 2] = 0;
+        } else {
+            buf[1] = 0;
         }
         Ok(())
     }
 
     pub fn from_bytes(bytes: &[u8]) -> anyhow::Result<FstpMessage> {
-        let (first, rest) = bytes.split_first().expect("Empty message");
-        let flag = Flag::from_bytes_flag(first)?;
-        let data = if rest.is_empty() {
+        let (header, data) = bytes.split_at(1);
+        let flag = Flag::from_bytes_flag(&header[0])?;
+        let data = if data.is_empty() {
             None
         } else {
-            Some(b_take_while(rest, |b| b != 0))
+            Some(b_take_while(data, |b| b != 0))
         };
         Ok(FstpMessage {
-            header: FstpHeader { flag },
+            header: FstpHeader { flag }, //, data_size },
             data,
         }) // return implicito
     }
 }
 
 impl Flag {
-    fn to_bytes_flag(&self, buf: &mut Vec<u8>) {
-        let mut i: u8 = 0;
+    fn to_bytes_flag(&self) -> u8 {
         match self {
-            Self::Add => i = 1u8,
-            Self::List => i = 2u8,
-            Self::File => i = 3u8,
-            // Self::Exit => i = 4u8,
-            Self::Ok => {}
+            Self::Ok => 1u8,
+            Self::Add => 2u8,
+            Self::List => 3u8,
+            Self::File => 4u8,
+            // Self::Exit =>buf[0] = 5u8,
         }
-        buf.push(i);
     }
 
     fn from_bytes_flag(byte: &u8) -> anyhow::Result<Flag> {
         match byte {
-            0 => Ok(Self::Ok),
-            1 => Ok(Flag::Add),
-            2 => Ok(Flag::List),
-            3 => Ok(Flag::File),
-            // 4 => Ok(Flag::Exit),
+            1 => Ok(Self::Ok),
+            2 => Ok(Flag::Add),
+            3 => Ok(Flag::List),
+            4 => Ok(Flag::File),
+            // 5 => Ok(Flag::Exit),
             _ => bail!("Flag inválida"),
         }
     }

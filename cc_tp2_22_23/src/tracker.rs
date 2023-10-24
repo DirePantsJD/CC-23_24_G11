@@ -27,9 +27,9 @@ fn handler(
     stream: &mut TcpStream,
     tracking: &mut HashMap<IpAddr, Vec<String>>,
 ) -> anyhow::Result<()> {
+    let mut buffer = [0u8; 100];
     loop {
         // let mut buffer = Vec::with_capacity(100);
-        let mut buffer = [0u8; 100];
         //prob vai ter de reconhecer fim da comunicação ou dar timeout
         while stream.read(&mut buffer)? == 0 {}
 
@@ -62,19 +62,19 @@ fn handler(
                 println!("{:?}", tracking);
             }
             Flag::List => {
-                let data: String = tracking
-                    .values()
-                    .cloned()
-                    .flat_map(|vec| vec.into_iter())
-                    .collect();
+                let mut data: String = String::new();
+                for (k, v) in &*tracking {
+                    data.push_str(&(k.to_string() + ":" + &v.join(",") + ";"));
+                }
                 println!("list:{:?}", data);
                 let list_msg = FstpMessage {
                     header: FstpHeader { flag: Flag::Ok },
                     data: Some(data.as_bytes()),
                 };
 
-                // list_msg.put_in_bytes(&mut buffer)?;
-                // stream.write_all(&mut buffer)?;
+                list_msg.put_in_bytes(&mut buffer)?;
+                stream.write_all(&mut buffer)?;
+                stream.flush()?;
             }
             Flag::File => {}
             // Flag::Exit => {

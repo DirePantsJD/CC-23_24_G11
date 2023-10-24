@@ -9,8 +9,6 @@ use std::net::{TcpStream, IpAddr};
 use std::str::from_utf8;
 
 fn main() -> anyhow::Result<()> {
-    let mut _buffer = [0u8; 50];
-
     let mut stream = TcpStream::connect("127.0.0.1:9090")
         .context("Can't connect to server")?;
 
@@ -31,7 +29,7 @@ fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
 
         match command.to_lowercase().trim_end() {
             "list" => {
-                let mut buf = Vec::with_capacity(100);
+                let mut buf = [0u8;100];
                 let msg = FstpMessage{
                     header: FstpHeader { flag: Flag::List },
                     data:None,
@@ -39,10 +37,11 @@ fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
                 msg.put_in_bytes(&mut buf)?;
                 stream.write_all(&buf)?;
                 stream.flush()?;
+
                 while stream.read(&mut buf)?==0 {}
                 
                 let response = FstpMessage::from_bytes(&buf)?;
-
+                println!("resp:{:?}",response);
                 if let Some(data) = response.data {
                     let entries = from_utf8(data).unwrap().split(|c| c == ';');
                     for entry in entries {
@@ -56,9 +55,10 @@ fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
                         }
                     }
                 }
+                println!("files_map:{:#?}",peers_files);
             }
             "file" => {
-                let mut _buf:Vec<u8> = Vec::with_capacity(100);
+                let mut _buf = [0u8;100];
                 let mut f_name = String::new();
                 stdout().write_all("Input file name\n".as_bytes())?;
                 stdout().flush()?;
@@ -78,7 +78,7 @@ fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
 
 fn contact_tracker(stream:&mut TcpStream) ->anyhow::Result<()> {
     let shared_files = get_shared_files();
-    let mut data_buffer = Vec::with_capacity(50);
+    let mut data_buffer = [0u8;100];
     println!("shared files:\n{}",shared_files);
     let msg = FstpMessage {
         header: FstpHeader { flag: Flag::Add },
