@@ -117,7 +117,7 @@ fn get_shared_files() -> String {
         .expect("Inválid path");
 
     let shared_dir: ReadDir =
-        read_dir(shared_path.clone()).expect(&format!("failed to read directory: {}",shared_path));
+        read_dir(shared_path.trim_end()).expect(&format!("failed to read directory: {}",shared_path));
 
     for try_entry in shared_dir {
         let entry = try_entry.expect("failed to read entry");
