@@ -155,6 +155,7 @@ impl PeersWithFile {
     pub fn set_peers_from_bytes(&mut self,bytes: &[u8]) -> anyhow::Result<()>{
         let peers = &mut self.peers;
         let len = bytes.len();
+        println!("{}",len);
         if len % 4 == 0 {
             for i in 0..(len/4) {
                 let idx = i*len;
