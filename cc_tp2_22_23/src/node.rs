@@ -45,7 +45,7 @@ fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
                 stream.flush()?;
 
                 if stream.read(&mut buf)? == 0 {
-                    bail!("Server no longer reachable");
+                    bail!("Tracker no longer reachable");
                 } 
                 
                 let response = FstpMessage::from_bytes(&buf)?;
