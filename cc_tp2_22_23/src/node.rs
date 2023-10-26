@@ -5,7 +5,7 @@ use fstp::*;
 use std::env;
 use std::fs::{read_dir, File, ReadDir};
 use std::io::{Read, Write, stdin,stdout};
-use std::net::{TcpStream, IpAddr, Ipv4Addr};
+use std::net::{TcpStream, IpAddr, Ipv4Addr, Shutdown};
 use std::str::from_utf8;
 
 fn main() -> anyhow::Result<()> {
@@ -44,7 +44,9 @@ fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
                 stream.write_all(&buf)?;
                 stream.flush()?;
 
-                stream.read(&mut buf)?; 
+                if stream.read(&mut buf)? == 0 {
+                    bail!("Server no longer reachable");
+                } 
                 
                 let response = FstpMessage::from_bytes(&buf)?;
                 println!("resp:{:?}",response);
@@ -72,7 +74,9 @@ fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
                 stream.write(&mut buf)?;
                 stream.flush()?;
 
-                stream.read(&mut buf)?; 
+                if stream.read(&mut buf)? == 0 {
+                    bail!("Server no longer reachable");
+                } 
                 
                 let resp = FstpMessage::from_bytes(&buf)?;
                 println!("resp:{:?}",resp);
@@ -82,10 +86,14 @@ fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
                 }
                 println!("{:?}",file_peers);
             }
+            "exit" => {
+                stream.shutdown(Shutdown::Both)?;
+                break;
+            }
             _=> println!("Invalid command: {}",command),
         }
     }
-    // Ok(())
+    Ok(())
 }
 
 fn contact_tracker(stream:&mut TcpStream) ->anyhow::Result<()> {
