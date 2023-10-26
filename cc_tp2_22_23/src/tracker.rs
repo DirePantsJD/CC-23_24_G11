@@ -22,7 +22,7 @@ fn main() -> anyhow::Result<()> {
         bail!("No tracker address specified (ip:port)");
     };
 
-    let t_pool = ThreadPool::new(10);
+    let t_pool = ThreadPool::new(5);
 
     for stream in tcp_listener.incoming() {
         println!("new connection");
@@ -119,8 +119,14 @@ fn handler(
             Flag::List => {
                 let mut data: String = String::new();
                 if let Ok(tracking_w_guard) = tracking.write() {
-                    for v in tracking_w_guard.values() {
-                        data.push_str(&(v.join(",") + ","));
+                    let mut uniq_vs: Vec<String> = tracking_w_guard
+                        .values()
+                        .cloned()
+                        .flatten()
+                        .collect::<Vec<_>>();
+                    uniq_vs.dedup();
+                    for s in uniq_vs {
+                        data.push_str(&(s + ","));
                     }
                     data.pop();
                 }
