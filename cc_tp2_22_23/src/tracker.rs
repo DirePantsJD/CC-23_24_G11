@@ -1,7 +1,7 @@
 #![feature(ip_bits)]
 use anyhow::{bail, Context};
 use fstp::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::io::{Read, Write};
 use std::net::{IpAddr, TcpListener, TcpStream};
@@ -119,12 +119,11 @@ fn handler(
             Flag::List => {
                 let mut data: String = String::new();
                 if let Ok(tracking_w_guard) = tracking.write() {
-                    let mut uniq_vs: Vec<String> = tracking_w_guard
+                    let uniq_vs: HashSet<String> = tracking_w_guard
                         .values()
                         .cloned()
                         .flatten()
-                        .collect::<Vec<_>>();
-                    uniq_vs.dedup();
+                        .collect::<HashSet<_>>();
                     for s in uniq_vs {
                         data.push_str(&(s + ","));
                     }
