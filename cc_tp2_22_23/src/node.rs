@@ -156,9 +156,10 @@ impl PeersWithFile {
         let peers = &mut self.peers;
         let len = bytes.len();
         println!("{}",len);
+        let max_iters = len/4;
         if len % 4 == 0 {
-            for i in 0..(len/4) {
-                let idx = i*len;
+            for i in 0..max_iters {
+                let idx = i*max_iters;
                 let b1 = bytes[idx];
                 let b2 = bytes[idx + 1];
                 let b3 = bytes[idx + 2];
