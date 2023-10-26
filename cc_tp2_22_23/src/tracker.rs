@@ -1,7 +1,7 @@
 #![feature(ip_bits)]
 use anyhow::{bail, Context};
 use fstp::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::io::{Read, Write};
 use std::net::{IpAddr, TcpListener, TcpStream};
@@ -22,7 +22,7 @@ fn main() -> anyhow::Result<()> {
         bail!("No tracker address specified (ip:port)");
     };
 
-    let t_pool = ThreadPool::new(10);
+    let t_pool = ThreadPool::new(5);
 
     for stream in tcp_listener.incoming() {
         println!("new connection");
@@ -50,7 +50,7 @@ fn handler(
     tracking: Arc<RwLock<HashMap<IpAddr, Vec<String>>>>,
     file_to_ips: Arc<RwLock<HashMap<String, Vec<IpAddr>>>>,
 ) -> anyhow::Result<()> {
-    let mut buffer = [0u8; 100];
+    let mut buffer = [0u8; 1000];
     loop {
         // Se o stream TCP for fechado
         if stream.read(&mut buffer)? == 0 {
@@ -119,8 +119,13 @@ fn handler(
             Flag::List => {
                 let mut data: String = String::new();
                 if let Ok(tracking_w_guard) = tracking.write() {
-                    for v in tracking_w_guard.values() {
-                        data.push_str(&(v.join(",") + ","));
+                    let uniq_vs: HashSet<String> = tracking_w_guard
+                        .values()
+                        .cloned()
+                        .flatten()
+                        .collect::<HashSet<_>>();
+                    for s in uniq_vs {
+                        data.push_str(&(s + ","));
                     }
                     data.pop();
                 }

@@ -5,7 +5,7 @@ use fstp::*;
 use std::env;
 use std::fs::{read_dir, File, ReadDir};
 use std::io::{Read, Write, stdin,stdout};
-use std::net::{TcpStream, IpAddr, Ipv4Addr};
+use std::net::{TcpStream, IpAddr, Ipv4Addr, Shutdown};
 use std::str::from_utf8;
 
 fn main() -> anyhow::Result<()> {
@@ -27,7 +27,7 @@ fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
     let mut files: Vec<String> = Vec::new();
     let mut file_peers = PeersWithFile::new(); 
     loop {
-        let mut buf = [0u8;100];
+        let mut buf = [0u8;1000];
         let mut raw_command = String::new();
         stdout().write_all("Input command\n".as_bytes())?;
         stdout().flush()?;
@@ -44,7 +44,9 @@ fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
                 stream.write_all(&buf)?;
                 stream.flush()?;
 
-                stream.read(&mut buf)?; 
+                if stream.read(&mut buf)? == 0 {
+                    bail!("Tracker no longer reachable");
+                } 
                 
                 let response = FstpMessage::from_bytes(&buf)?;
                 println!("resp:{:?}",response);
@@ -72,7 +74,9 @@ fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
                 stream.write(&mut buf)?;
                 stream.flush()?;
 
-                stream.read(&mut buf)?; 
+                if stream.read(&mut buf)? == 0 {
+                    bail!("Server no longer reachable");
+                } 
                 
                 let resp = FstpMessage::from_bytes(&buf)?;
                 println!("resp:{:?}",resp);
@@ -82,15 +86,19 @@ fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
                 }
                 println!("{:?}",file_peers);
             }
+            "exit" => {
+                stream.shutdown(Shutdown::Both)?;
+                break;
+            }
             _=> println!("Invalid command: {}",command),
         }
     }
-    // Ok(())
+    Ok(())
 }
 
 fn contact_tracker(stream:&mut TcpStream) ->anyhow::Result<()> {
     let shared_files = get_shared_files();
-    let mut data_buffer = [0u8;100];
+    let mut data_buffer = [0u8;1000];
     println!("shared files:\n{}",shared_files);
     let msg = FstpMessage {
         header: FstpHeader { 
@@ -117,16 +125,17 @@ fn get_shared_files() -> String {
         .expect("Inválid path");
 
     let shared_dir: ReadDir =
-        read_dir(shared_path).expect("failed to read directory");
+        read_dir(shared_path.trim_end()).expect(&format!("failed to read directory: {}",shared_path));
 
     for try_entry in shared_dir {
         let entry = try_entry.expect("failed to read entry");
         let path = entry.path();
 
         if path.is_file() 
-        && let Some(ext) = path.extension().and_then(|os_ext| os_ext.to_str()) 
+        // && let Some(ext) = path.extension().and_then(|os_ext| os_ext.to_str()) 
         && let Some(name) = path.file_name().and_then(|os_str| os_str.to_str())
-        && ext == "gush" {
+        // && ext == "gush"
+         {
            shared_files.push_str(&(name.to_owned() + ","));
         }
     }
@@ -154,9 +163,11 @@ impl PeersWithFile {
     pub fn set_peers_from_bytes(&mut self,bytes: &[u8]) -> anyhow::Result<()>{
         let peers = &mut self.peers;
         let len = bytes.len();
+        println!("{}",len);
+        let max_iters = len/4;
         if len % 4 == 0 {
-            for i in 0..(len/4) {
-                let idx = i*len;
+            for i in 0..max_iters {
+                let idx = i*4;
                 let b1 = bytes[idx];
                 let b2 = bytes[idx + 1];
                 let b3 = bytes[idx + 2];
