@@ -1,11 +1,10 @@
 #![feature(let_chains)]
 
-use anyhow::Context;
+use anyhow::{Context, bail};
 use fstp::*;
-use std::collections::HashMap;
 use std::fs::{read_dir, File, ReadDir};
 use std::io::{Read, Write, stdin,stdout};
-use std::net::{TcpStream, IpAddr};
+use std::net::{TcpStream, IpAddr, Ipv4Addr};
 use std::str::from_utf8;
 
 fn main() -> anyhow::Result<()> {
@@ -20,7 +19,8 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
-    let mut peers_files: HashMap<IpAddr,Vec<String>> = HashMap::new();
+    let mut files: Vec<String> = Vec::new();
+    let mut file_peers = PeersWithFile::new(); 
     loop {
         let mut buf = [0u8;100];
         let mut raw_command = String::new();
@@ -44,19 +44,12 @@ fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
                 let response = FstpMessage::from_bytes(&buf)?;
                 println!("resp:{:?}",response);
                 if let Some(data) = response.data {
-                    let entries = from_utf8(data).unwrap().split(|c| c == ';');
-                    for entry in entries {
-                       if let Some((ip,files)) = entry.split_once(':'){
-                            let ip = ip.parse::<IpAddr>()?;
-                            let files_v:Vec<String> = 
-                                files.split(|c| c==',')
-                                    .map(|str| String::from(str))
-                                    .collect();
-                            peers_files.insert(ip, files_v);
-                        }
+                    let list = from_utf8(data).unwrap().split(|c| c == ',');
+                    for f in list {
+                        files.push(String::from(f));
                     }
                 }
-                println!("files_map:{:#?}",peers_files);
+                println!("files:{:#?}",files);
             }
             "file" => {
                 let mut f_name = String::new();
@@ -76,23 +69,28 @@ fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
 
                 while stream.read(&mut buf)?==0 {}
                 
-                let response = FstpMessage::from_bytes(&buf)?;
-                println!("resp:{:?}",response);
-                //TODO: por info numa struct qualquer;
+                let resp = FstpMessage::from_bytes(&buf)?;
+                println!("resp:{:?}",resp);
+                if let Some(data) = resp.data {
+                    file_peers.set_name(&f_name.trim_end());
+                    file_peers.set_peers_from_bytes(data)?;
+                }
+                println!("{:?}",file_peers);
             }
             "exit" => {
                 stream.shutdown(std::net::Shutdown::Both)?;
+                break;
             }
             _=> println!("Invalid command: {}",command),
         }
     }
+    Ok(())
 }
 
 fn contact_tracker(stream:&mut TcpStream) ->anyhow::Result<()> {
     let shared_files = get_shared_files();
     let mut data_buffer = [0u8;100];
     println!("shared files:\n{}",shared_files);
-    println!("sf:len{:?}",shared_files.len());
     let msg = FstpMessage {
         header: FstpHeader { 
             flag: Flag::Add,
@@ -133,4 +131,41 @@ fn get_shared_files() -> String {
     }
     shared_files.pop();
     shared_files
+}
+
+#[derive(Debug)]
+struct PeersWithFile {
+    name: String,
+    peers: Vec<IpAddr>,
+}
+
+impl PeersWithFile {
+    pub fn new() -> Self {
+        PeersWithFile {
+            name: String::new(),
+            peers: Vec::new(),
+        }
+    }
+     pub fn set_name(&mut self,str:&str) {
+        self.name.push_str(str);
+    }
+
+    pub fn set_peers_from_bytes(&mut self,bytes: &[u8]) -> anyhow::Result<()>{
+        let peers = &mut self.peers;
+        let len = bytes.len();
+        if len % 4 == 0 {
+            for i in 0..(len/4) {
+                let idx = i*len;
+                let b1 = bytes[idx];
+                let b2 = bytes[idx + 1];
+                let b3 = bytes[idx + 2];
+                let b4 = bytes[idx + 3]; 
+                let peer = IpAddr::V4(Ipv4Addr::new(b1,b2,b3,b4));  
+                peers.push(peer);
+            }
+        } else {
+            bail!("Corrupted addresses")
+        }
+        Ok(())
+    }
 }

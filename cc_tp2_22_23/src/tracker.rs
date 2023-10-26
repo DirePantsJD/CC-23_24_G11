@@ -3,7 +3,7 @@ use anyhow::Context;
 use fstp::*;
 use std::collections::HashMap;
 use std::io::{Read, Write};
-use std::net::{IpAddr, TcpListener, TcpStream};
+use std::net::{IpAddr, Ipv4Addr, TcpListener, TcpStream};
 use std::str::from_utf8;
 
 fn main() -> anyhow::Result<()> {
@@ -71,9 +71,10 @@ fn handler(stream: &mut TcpStream) -> anyhow::Result<()> {
             }
             Flag::List => {
                 let mut data: String = String::new();
-                for (k, v) in &tracking {
-                    data.push_str(&(k.to_string() + ":" + &v.join(",") + ";"));
+                for v in tracking.values() {
+                    data.push_str(&(v.join(",") + ","));
                 }
+                data.pop();
                 println!("list:{:?}", data);
                 let list_msg = FstpMessage {
                     header: FstpHeader {
@@ -107,7 +108,7 @@ fn handler(stream: &mut TcpStream) -> anyhow::Result<()> {
                                 flag: Flag::Ok,
                                 data_size: ips_bytes.len() as u16,
                             },
-                            data: Some(&ips_bytes),
+                            data: Some(ips_bytes.as_slice()),
                         };
                         println!("Pre send:{:?}", resp);
                         resp.put_in_bytes(&mut buffer)?;

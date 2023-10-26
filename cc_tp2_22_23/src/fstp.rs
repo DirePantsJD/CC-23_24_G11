@@ -20,7 +20,6 @@ pub enum Flag {
     Add,
     List,
     File,
-    // Exit,
 }
 
 impl<'a> FstpMessage<'a> {
