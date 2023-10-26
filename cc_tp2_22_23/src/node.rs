@@ -27,7 +27,7 @@ fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
     let mut files: Vec<String> = Vec::new();
     let mut file_peers = PeersWithFile::new(); 
     loop {
-        let mut buf = [0u8;100];
+        let mut buf = [0u8;1000];
         let mut raw_command = String::new();
         stdout().write_all("Input command\n".as_bytes())?;
         stdout().flush()?;
@@ -90,7 +90,7 @@ fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
 
 fn contact_tracker(stream:&mut TcpStream) ->anyhow::Result<()> {
     let shared_files = get_shared_files();
-    let mut data_buffer = [0u8;100];
+    let mut data_buffer = [0u8;1000];
     println!("shared files:\n{}",shared_files);
     let msg = FstpMessage {
         header: FstpHeader { 

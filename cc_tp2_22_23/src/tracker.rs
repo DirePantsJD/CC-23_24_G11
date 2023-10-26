@@ -50,7 +50,7 @@ fn handler(
     tracking: Arc<RwLock<HashMap<IpAddr, Vec<String>>>>,
     file_to_ips: Arc<RwLock<HashMap<String, Vec<IpAddr>>>>,
 ) -> anyhow::Result<()> {
-    let mut buffer = [0u8; 100];
+    let mut buffer = [0u8; 1000];
     loop {
         // Se o stream TCP for fechado
         if stream.read(&mut buffer)? == 0 {
