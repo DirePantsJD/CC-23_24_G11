@@ -114,7 +114,7 @@ fn get_shared_files() -> String {
     let mut shared_path = String::new();
     config
         .read_to_string(&mut shared_path)
-        .expect("Inválid path");
+        .expect(&format!("Inválid path {}",shared_path));
 
     let shared_dir: ReadDir =
         read_dir(shared_path).expect("failed to read directory");
