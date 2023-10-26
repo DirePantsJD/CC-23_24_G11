@@ -124,9 +124,10 @@ fn get_shared_files() -> String {
         let path = entry.path();
 
         if path.is_file() 
-        && let Some(ext) = path.extension().and_then(|os_ext| os_ext.to_str()) 
+        // && let Some(ext) = path.extension().and_then(|os_ext| os_ext.to_str()) 
         && let Some(name) = path.file_name().and_then(|os_str| os_str.to_str())
-        && ext == "gush" {
+        // && ext == "gush"
+         {
            shared_files.push_str(&(name.to_owned() + ","));
         }
     }
