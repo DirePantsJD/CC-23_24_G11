@@ -3,17 +3,19 @@ use anyhow::Context;
 use fstp::*;
 use std::collections::HashMap;
 use std::io::{Read, Write};
-use std::net::{IpAddr, Ipv4Addr, TcpListener, TcpStream};
+use std::net::{IpAddr, TcpListener, TcpStream};
 use std::str::from_utf8;
 
 fn main() -> anyhow::Result<()> {
+    let mut tracking: HashMap<IpAddr, Vec<String>> = HashMap::new();
+    let mut file_to_ip: HashMap<String, Vec<IpAddr>> = HashMap::new();
     let tcp_listener =
         TcpListener::bind("127.0.0.1:9090").context("binding failed")?;
 
     for mut stream in tcp_listener.incoming() {
         println!("new connection");
         match &mut stream {
-            Ok(stream) => handler(stream)?,
+            Ok(stream) => handler(stream, &mut tracking, &mut file_to_ip)?,
             Err(addr) => println!("Couldn't connect to {}", addr),
         }
     }
@@ -22,13 +24,26 @@ fn main() -> anyhow::Result<()> {
 }
 
 // Pega na conexao
-fn handler(stream: &mut TcpStream) -> anyhow::Result<()> {
-    let mut tracking: HashMap<IpAddr, Vec<String>> = HashMap::new();
-    let mut file_to_ip: HashMap<String, Vec<IpAddr>> = HashMap::new();
+fn handler(
+    stream: &mut TcpStream,
+    tracking: &mut HashMap<IpAddr, Vec<String>>,
+    file_to_ips: &mut HashMap<String, Vec<IpAddr>>,
+) -> anyhow::Result<()> {
     let mut buffer = [0u8; 100];
     loop {
-        //prob vai ter de reconhecer fim da comunicação ou dar timeout
-        while stream.read(&mut buffer)? == 0 {}
+        // Se o stream TCP dor fechado
+        if stream.read(&mut buffer)? == 0 {
+            let peer_ip = &stream.peer_addr()?.ip();
+            tracking.remove(peer_ip);
+            for (_, ips) in file_to_ips.iter_mut() {
+                if ips.contains(peer_ip) {
+                    if let Some(pos) = ips.iter().position(|ip| ip == peer_ip) {
+                        ips.remove(pos);
+                    }
+                }
+            }
+            return Ok(());
+        }
 
         let msg = FstpMessage::from_bytes(&buffer)?;
         println!("{:?}\n", &msg);
@@ -54,20 +69,20 @@ fn handler(stream: &mut TcpStream) -> anyhow::Result<()> {
                                 .unwrap()
                                 .push(file_name.to_string());
                         }
-                        if !file_to_ip.contains_key(file_name) {
-                            file_to_ip.insert(
+                        if !file_to_ips.contains_key(file_name) {
+                            file_to_ips.insert(
                                 String::from(file_name),
                                 vec![ip.clone()],
                             );
                         }
-                        let val = file_to_ip.get_mut(file_name).unwrap();
+                        let val = file_to_ips.get_mut(file_name).unwrap();
                         if !val.contains(&ip) {
                             val.push(ip);
                         }
                     }
                 }
                 println!("{:?}", tracking);
-                println!("{:?}", file_to_ip);
+                println!("{:?}", file_to_ips);
             }
             Flag::List => {
                 let mut data: String = String::new();
@@ -92,7 +107,7 @@ fn handler(stream: &mut TcpStream) -> anyhow::Result<()> {
                 if let Some(data) = msg.data {
                     let file = from_utf8(data).unwrap().trim_end();
                     println!("Requested file: {}", file);
-                    if let Some(mut ips) = file_to_ip.get(file).cloned() {
+                    if let Some(mut ips) = file_to_ips.get(file).cloned() {
                         let ips_bytes: Vec<[u8; 4]> = ips
                             .iter_mut()
                             .map(|ip| match ip {

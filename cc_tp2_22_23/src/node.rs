@@ -39,7 +39,7 @@ fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
                 stream.write_all(&buf)?;
                 stream.flush()?;
 
-                while stream.read(&mut buf)?==0 {}
+                stream.read(&mut buf)?; 
                 
                 let response = FstpMessage::from_bytes(&buf)?;
                 println!("resp:{:?}",response);
@@ -67,7 +67,7 @@ fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
                 stream.write(&mut buf)?;
                 stream.flush()?;
 
-                while stream.read(&mut buf)?==0 {}
+                stream.read(&mut buf)?; 
                 
                 let resp = FstpMessage::from_bytes(&buf)?;
                 println!("resp:{:?}",resp);
@@ -77,14 +77,10 @@ fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
                 }
                 println!("{:?}",file_peers);
             }
-            "exit" => {
-                stream.shutdown(std::net::Shutdown::Both)?;
-                break;
-            }
             _=> println!("Invalid command: {}",command),
         }
     }
-    Ok(())
+    // Ok(())
 }
 
 fn contact_tracker(stream:&mut TcpStream) ->anyhow::Result<()> {

@@ -2,6 +2,7 @@
 
 use anyhow::bail;
 
+//TODO: Cenas de DNS
 #[derive(Debug)]
 pub struct FstpMessage<'a> {
     pub header: FstpHeader,
