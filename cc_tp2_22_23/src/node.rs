@@ -2,14 +2,19 @@
 
 use anyhow::{Context, bail};
 use fstp::*;
+use std::env;
 use std::fs::{read_dir, File, ReadDir};
 use std::io::{Read, Write, stdin,stdout};
 use std::net::{TcpStream, IpAddr, Ipv4Addr};
 use std::str::from_utf8;
 
 fn main() -> anyhow::Result<()> {
-    let mut stream = TcpStream::connect("127.0.0.1:9090")
-        .context("Can't connect to server")?;
+    let mut stream = if let Some(tracker_addr) = env::args().nth(1){
+        TcpStream::connect(tracker_addr)    
+        .context("Can't connect to server")?
+    } else {
+        bail!("No tracker address specified (ip:port)")
+    };
 
     contact_tracker(&mut stream)?;
 

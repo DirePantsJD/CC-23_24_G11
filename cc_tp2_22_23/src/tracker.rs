@@ -9,6 +9,7 @@ use std::str::from_utf8;
 fn main() -> anyhow::Result<()> {
     let mut tracking: HashMap<IpAddr, Vec<String>> = HashMap::new();
     let mut file_to_ip: HashMap<String, Vec<IpAddr>> = HashMap::new();
+
     let tcp_listener =
         TcpListener::bind("127.0.0.1:9090").context("binding failed")?;
 
