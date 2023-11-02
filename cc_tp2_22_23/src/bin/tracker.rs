@@ -1,6 +1,6 @@
 #![feature(ip_bits)]
 use anyhow::{bail, Context};
-use fstp::*;
+use local::fstp::*;
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::io::{Read, Write};
