@@ -77,7 +77,7 @@ impl Flag {
     }
 }
 
-pub fn b_take_while(bytes: &[u8], predicate: impl Fn(u8) -> bool) -> &[u8] {
+pub fn b_take_while(bytes: &[u8], predicate: impl Fn(u8) -> bool) -> &[u8] { //Deprecated
     let mut idx = 0;
     for (i, byte) in bytes.iter().enumerate() {
         if !predicate(*byte) {
