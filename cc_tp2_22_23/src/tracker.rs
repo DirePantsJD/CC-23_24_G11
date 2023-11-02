@@ -8,7 +8,6 @@ use std::net::{IpAddr, TcpListener, TcpStream};
 use std::str::from_utf8;
 use std::sync::{Arc, RwLock};
 use threadpool::ThreadPool;
-// use std::sync::mpsc::channel;
 
 fn main() -> anyhow::Result<()> {
     let tracking_lock: Arc<RwLock<HashMap<IpAddr, Vec<String>>>> =
@@ -71,111 +70,128 @@ fn handler(
             }
             return Ok(());
         }
-
-        let msg = FstpMessage::from_bytes(&buffer)?;
+        let b = buffer.clone();
+        let msg = FstpMessage::from_bytes(&b)?;
         println!("{:?}\n", &msg);
 
         match msg.header.flag {
-            Flag::Add => {
-                if let Some(data) = msg.data {
-                    let files = from_utf8(data).unwrap().split(|c| c == ',');
-
-                    let ip = stream.peer_addr().unwrap().ip();
-                    //adiciona <ip,Vec> se n existir
-                    if let Ok(mut tracking_w_guard) = tracking.write() {
-                        if !tracking_w_guard.contains_key(&ip) {
-                            tracking_w_guard.insert(ip.clone(), Vec::new());
-                        }
-                        //Associa os nomes dos ficheiros no map de tracking_w_guard
-                        //ao ip do cliente no stream
-                        for file_name in files {
-                            let names_vec = tracking_w_guard.get(&ip).unwrap();
-
-                            if !names_vec.iter().any(|s| s == file_name) {
-                                tracking_w_guard
-                                    .get_mut(&ip)
-                                    .unwrap()
-                                    .push(file_name.to_string());
-                            }
-                            if let Ok(mut ftis_w_guard) = file_to_ips.write() {
-                                if !ftis_w_guard.contains_key(file_name) {
-                                    ftis_w_guard.insert(
-                                        String::from(file_name),
-                                        vec![ip.clone()],
-                                    );
-                                }
-                                let val =
-                                    ftis_w_guard.get_mut(file_name).unwrap();
-                                if !val.contains(&ip) {
-                                    val.push(ip);
-                                }
-                            }
-                        }
-                    }
-                }
-                println!("{:?}", tracking);
-                println!("{:?}", file_to_ips);
-            }
-            Flag::List => {
-                let mut data: String = String::new();
-                if let Ok(tracking_w_guard) = tracking.write() {
-                    let uniq_vs: HashSet<String> = tracking_w_guard
-                        .values()
-                        .cloned()
-                        .flatten()
-                        .collect::<HashSet<_>>();
-                    for s in uniq_vs {
-                        data.push_str(&(s + ","));
-                    }
-                    data.pop();
-                }
-                println!("list:{:?}", data);
-                let list_msg = FstpMessage {
-                    header: FstpHeader {
-                        flag: Flag::Ok,
-                        data_size: data.len() as u16,
-                    },
-                    data: Some(data.as_bytes()),
-                };
-
-                list_msg.put_in_bytes(&mut buffer)?;
-                stream.write_all(&mut buffer)?;
-                stream.flush()?;
-            }
-            Flag::File => {
-                if let Some(data) = msg.data {
-                    let file = from_utf8(data).unwrap().trim_end();
-                    println!("Requested file: {}", file);
-                    let mut ips: Option<Vec<_>> = None;
-                    if let Ok(ftis_w_guard) = file_to_ips.write() {
-                        ips = ftis_w_guard.get(file).cloned();
-                    }
-                    if let Some(mut ips) = ips {
-                        let ips_bytes: Vec<[u8; 4]> = ips
-                            .iter_mut()
-                            .map(|ip| match ip {
-                                IpAddr::V4(ipv4) => {
-                                    ipv4.to_bits().to_be_bytes()
-                                }
-                                _ => [0u8; 4],
-                            })
-                            .collect();
-                        let ips_bytes = ips_bytes.concat();
-                        let resp = FstpMessage {
-                            header: FstpHeader {
-                                flag: Flag::Ok,
-                                data_size: ips_bytes.len() as u16,
-                            },
-                            data: Some(ips_bytes.as_slice()),
-                        };
-                        println!("Pre send:{:?}", resp);
-                        resp.put_in_bytes(&mut buffer)?;
-                        stream.write_all(&mut buffer)?;
-                        stream.flush()?;
-                    }
-                }
-            }
+            Flag::Add => add(&mut stream, &tracking, &file_to_ips, msg),
+            Flag::List => list(&mut stream, &tracking, &mut buffer)?,
+            Flag::File => file(&mut stream, &file_to_ips, msg, &mut buffer)?,
             Flag::Ok => {} //Em principio não deve de acontecer
         }
     }
+}
+
+fn add(
+    stream: &mut TcpStream,
+    tracking: &Arc<RwLock<HashMap<IpAddr, Vec<String>>>>,
+    file_to_ips: &Arc<RwLock<HashMap<String, Vec<IpAddr>>>>,
+    msg: FstpMessage,
+) {
+    if let Some(data) = msg.data {
+        let files = from_utf8(data).unwrap().split(|c| c == ',');
+
+        let ip = stream.peer_addr().unwrap().ip();
+        //adiciona <ip,Vec> se n existir
+        if let Ok(mut tracking_w_guard) = tracking.write() {
+            if !tracking_w_guard.contains_key(&ip) {
+                tracking_w_guard.insert(ip.clone(), Vec::new());
+            }
+            //Associa os nomes dos ficheiros no map de tracking_w_guard
+            //ao ip do cliente no stream
+            for file_name in files {
+                let names_vec = tracking_w_guard.get(&ip).unwrap();
+
+                if !names_vec.iter().any(|s| s == file_name) {
+                    tracking_w_guard
+                        .get_mut(&ip)
+                        .unwrap()
+                        .push(file_name.to_string());
+                }
+                if let Ok(mut ftis_w_guard) = file_to_ips.write() {
+                    if !ftis_w_guard.contains_key(file_name) {
+                        ftis_w_guard
+                            .insert(String::from(file_name), vec![ip.clone()]);
+                    }
+                    let val = ftis_w_guard.get_mut(file_name).unwrap();
+                    if !val.contains(&ip) {
+                        val.push(ip);
+                    }
+                }
+            }
+        }
+    }
+    println!("{:?}", tracking);
+    println!("{:?}", file_to_ips);
+}
+
+fn list(
+    stream: &mut TcpStream,
+    tracking: &Arc<RwLock<HashMap<IpAddr, Vec<String>>>>,
+    buffer: &mut [u8],
+) -> anyhow::Result<()> {
+    let mut data: String = String::new();
+    if let Ok(tracking_w_guard) = tracking.write() {
+        let uniq_vs: HashSet<String> = tracking_w_guard
+            .values()
+            .cloned()
+            .flatten()
+            .collect::<HashSet<_>>();
+        for s in uniq_vs {
+            data.push_str(&(s + ","));
+        }
+        data.pop();
+    }
+    println!("list:{:?}", data);
+    let list_msg = FstpMessage {
+        header: FstpHeader {
+            flag: Flag::Ok,
+            data_size: data.len() as u16,
+        },
+        data: Some(data.as_bytes()),
+    };
+
+    list_msg.put_in_bytes(buffer)?;
+    stream.write_all(buffer)?;
+    stream.flush()?;
+    Ok(())
+}
+
+fn file(
+    stream: &mut TcpStream,
+    file_to_ips: &Arc<RwLock<HashMap<String, Vec<IpAddr>>>>,
+    msg: FstpMessage,
+    buffer: &mut [u8],
+) -> anyhow::Result<()> {
+    if let Some(data) = msg.data {
+        let file = from_utf8(data).unwrap().trim_end();
+        println!("Requested file: {}", file);
+        let mut ips: Option<Vec<_>> = None;
+        if let Ok(ftis_w_guard) = file_to_ips.write() {
+            ips = ftis_w_guard.get(file).cloned();
+        }
+        if let Some(mut ips) = ips {
+            let ips_bytes: Vec<[u8; 4]> = ips
+                .iter_mut()
+                .map(|ip| match ip {
+                    IpAddr::V4(ipv4) => ipv4.to_bits().to_be_bytes(),
+                    _ => [0u8; 4],
+                })
+                .collect();
+            let ips_bytes = ips_bytes.concat();
+            let resp = FstpMessage {
+                header: FstpHeader {
+                    flag: Flag::Ok,
+                    data_size: ips_bytes.len() as u16,
+                },
+                data: Some(ips_bytes.as_slice()),
+            };
+            println!("Pre send:{:?}", resp);
+            resp.put_in_bytes(buffer)?;
+            stream.write_all(buffer)?;
+            stream.flush()?;
+        }
+    }
+    Ok(())
 }
