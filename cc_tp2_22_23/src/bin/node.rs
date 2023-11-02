@@ -1,7 +1,7 @@
 #![feature(let_chains)]
 
 use anyhow::{Context, bail};
-use fstp::*;
+use local::fstp::*;
 use std::env;
 use std::fs::{read_dir, File, ReadDir};
 use std::io::{Read, Write, stdin,stdout};
