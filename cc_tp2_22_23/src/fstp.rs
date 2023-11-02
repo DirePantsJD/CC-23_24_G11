@@ -3,6 +3,7 @@
 use anyhow::bail;
 
 //TODO: Cenas de DNS
+//TODO: Meta Dados
 #[derive(Debug)]
 pub struct FstpMessage<'a> {
     pub header: FstpHeader,
@@ -61,7 +62,6 @@ impl Flag {
             Self::Add => 2u8,
             Self::List => 3u8,
             Self::File => 4u8,
-            // Self::Exit =>buf[0] = 5u8,
         }
     }
 
@@ -71,20 +71,7 @@ impl Flag {
             2 => Ok(Flag::Add),
             3 => Ok(Flag::List),
             4 => Ok(Flag::File),
-            // 5 => Ok(Flag::Exit),
             _ => bail!("Flag inválida"),
         }
     }
-}
-
-pub fn b_take_while(bytes: &[u8], predicate: impl Fn(u8) -> bool) -> &[u8] {
-    let mut idx = 0;
-    for (i, byte) in bytes.iter().enumerate() {
-        if !predicate(*byte) {
-            break;
-        }
-        idx = i;
-    }
-    let (result, _) = bytes.split_at(idx + 1);
-    result
 }
