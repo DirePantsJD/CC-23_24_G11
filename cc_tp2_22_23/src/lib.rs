@@ -27,14 +27,11 @@ pub mod fstp {
     impl<'a> FstpMessage<'a> {
         pub fn put_in_bytes(self, buf: &mut [u8]) -> anyhow::Result<()> {
             let flag = &self.header.flag;
-            let d_s = self.header.data_size;
             buf[0] = flag.to_bytes_flag();
-            buf[1] = (d_s >> 8) as u8;
-            buf[2] = d_s as u8;
+            let b_data_size = self.header.data_size.to_be_bytes();
+            buf[1..3].copy_from_slice(&b_data_size);
             if let Some(data) = self.data {
-                for i in 0..data.len() {
-                    buf[i + 3] = data[i];
-                }
+                buf[3..3 + data.len()].copy_from_slice(data);
             }
             Ok(())
         }
@@ -72,6 +69,41 @@ pub mod fstp {
                 3 => Ok(Flag::List),
                 4 => Ok(Flag::File),
                 _ => bail!("Flag inválida"),
+            }
+        }
+    }
+}
+
+pub mod file_meta {
+    use std::str::from_utf8;
+
+    #[derive(Debug, Default, Clone)]
+    pub struct FileMeta {
+        pub size: u64,
+        pub n_blocks: u32,
+        pub name: String,
+    }
+
+    impl FileMeta {
+        pub fn as_bytes(self) -> Vec<u8> {
+            let s_bs = self.name.as_bytes();
+            let mut buf = Vec::with_capacity(12 + s_bs.len());
+            let b_size = self.size.to_be_bytes();
+            let b_n_blocks = self.size.to_be_bytes();
+            buf[..8].copy_from_slice(&b_size);
+            buf[8..12].copy_from_slice(&b_n_blocks);
+            buf[12..12 + s_bs.len()].copy_from_slice(s_bs);
+            buf
+        }
+
+        pub fn from_bytes(bytes: &[u8]) -> FileMeta {
+            let size = u64::from_be_bytes(bytes[0..8].try_into().unwrap());
+            let n_blocks = u32::from_be_bytes(bytes[8..12].try_into().unwrap());
+            let name = String::from(from_utf8(&bytes[12..]).unwrap());
+            FileMeta {
+                size,
+                n_blocks,
+                name,
             }
         }
     }
