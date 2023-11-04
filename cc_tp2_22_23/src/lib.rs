@@ -77,7 +77,7 @@ pub mod fstp {
 pub mod file_meta {
     use std::str::from_utf8;
 
-    #[derive(Debug, Default, Clone)]
+    #[derive(Debug, Clone, Hash)]
     pub struct FileMeta {
         pub size: u64,
         pub n_blocks: u32,
@@ -107,4 +107,10 @@ pub mod file_meta {
             }
         }
     }
+    impl PartialEq for FileMeta {
+        fn eq(&self, other: &Self) -> bool {
+            self.name == other.name
+        }
+    }
+    impl Eq for FileMeta {}
 }

@@ -11,7 +11,7 @@ use std::sync::{Arc, RwLock};
 use threadpool::ThreadPool;
 
 fn main() -> anyhow::Result<()> {
-    let tracking_lock: Arc<RwLock<HashMap<IpAddr, Vec<String>>>> =
+    let tracking_lock: Arc<RwLock<HashMap<IpAddr, Vec<FileMeta>>>> =
         Arc::new(RwLock::new(HashMap::new()));
     let file_to_ip_lock: Arc<RwLock<HashMap<String, Vec<IpAddr>>>> =
         Arc::new(RwLock::new(HashMap::new()));
@@ -51,7 +51,7 @@ fn main() -> anyhow::Result<()> {
 // Pega na conexao
 fn handler(
     mut stream: TcpStream,
-    tracking_lock: Arc<RwLock<HashMap<IpAddr, Vec<String>>>>,
+    tracking_lock: Arc<RwLock<HashMap<IpAddr, Vec<FileMeta>>>>,
     file_to_ips_lock: Arc<RwLock<HashMap<String, Vec<IpAddr>>>>,
 ) -> anyhow::Result<()> {
     let mut buffer = [0u8; 1000];
@@ -94,16 +94,19 @@ fn handler(
 
 fn add(
     stream: &mut TcpStream,
-    tracking_lock: &Arc<RwLock<HashMap<IpAddr, Vec<String>>>>,
+    tracking_lock: &Arc<RwLock<HashMap<IpAddr, Vec<FileMeta>>>>,
     file_to_ips_lock: &Arc<RwLock<HashMap<String, Vec<IpAddr>>>>,
     msg: FstpMessage,
 ) {
     if let Some(data) = msg.data {
         let mut files_meta = Vec::new();
-        for i in 0..data.len() {
+        let mut iter = (0..data.len()).into_iter();
+
+        while let Some(i) = iter.next() {
             let fm_len = data[i] as usize;
             let fm = FileMeta::from_bytes(&data[i + 1..i + 1 + fm_len]);
             files_meta.push(fm);
+            iter.nth(fm_len - 2);
         }
 
         let ip = stream.peer_addr().unwrap().ip();
@@ -112,16 +115,14 @@ fn add(
             if !tracking.contains_key(&ip) {
                 tracking.insert(ip.clone(), Vec::new());
             }
-            //Associa os nomes dos ficheiros no map de tracking
+            //Associa os metadados dos ficheiros no map de tracking
             //ao ip do cliente no stream
             for file_meta in files_meta {
-                //TODO: por size e n_blocks para alem do nome
-                // considerar mudar structs
-                let file_name = file_meta.name;
-                let names_vec = tracking.get(&ip).unwrap();
+                let file_name = file_meta.name.clone();
+                let fs_m_vec = tracking.get(&ip).unwrap();
 
-                if !names_vec.iter().any(|s| *s == file_name) {
-                    tracking.get_mut(&ip).unwrap().push(file_name.to_string());
+                if !fs_m_vec.iter().any(|fm| *fm.name == file_name) {
+                    tracking.get_mut(&ip).unwrap().push(file_meta);
                 }
                 if let Ok(mut file_to_ips) = file_to_ips_lock.write() {
                     if !file_to_ips.contains_key(&file_name) {
@@ -142,15 +143,15 @@ fn add(
 
 fn list(
     stream: &mut TcpStream,
-    tracking_lock: &Arc<RwLock<HashMap<IpAddr, Vec<String>>>>,
+    tracking_lock: &Arc<RwLock<HashMap<IpAddr, Vec<FileMeta>>>>,
     buffer: &mut [u8],
 ) -> anyhow::Result<()> {
     let mut data: String = String::new();
     if let Ok(tracking) = tracking_lock.write() {
-        let uniq_vs: HashSet<String> =
+        let uniq_vs: HashSet<FileMeta> =
             tracking.values().cloned().flatten().collect::<HashSet<_>>();
-        for s in uniq_vs {
-            data.push_str(&(s + ","));
+        for fm in uniq_vs {
+            data.push_str(&(fm.name + ","));
         }
         data.pop();
     }
@@ -169,6 +170,7 @@ fn list(
     Ok(())
 }
 
+//TODO: Enviar metadados
 fn file(
     stream: &mut TcpStream,
     file_to_ips_lock: &Arc<RwLock<HashMap<String, Vec<IpAddr>>>>,
