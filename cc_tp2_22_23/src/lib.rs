@@ -27,8 +27,8 @@ pub mod fstp {
     impl<'a> FstpMessage<'a> {
         pub fn put_in_bytes(self, buf: &mut [u8]) -> anyhow::Result<()> {
             let flag = &self.header.flag;
-            buf[0] = flag.to_bytes_flag();
-            let b_data_size = self.header.data_size.to_be_bytes();
+            buf[0] = flag.to_bytes();
+            let b_data_size: [u8; 2] = self.header.data_size.to_be_bytes();
             buf[1..3].copy_from_slice(&b_data_size);
             if let Some(data) = self.data {
                 buf[3..3 + data.len()].copy_from_slice(data);
@@ -38,22 +38,26 @@ pub mod fstp {
 
         pub fn from_bytes(bytes: &[u8]) -> anyhow::Result<FstpMessage> {
             let (header, data) = bytes.split_at(3);
-            let flag = Flag::from_bytes_flag(&header[0])?;
-            let data_size = ((header[1] as u16) << 8) | header[2] as u16;
-            let data = if data_size == 0 {
+            let flag = Flag::from_bytes(&header[0])?;
+            let b_data_size =
+                u16::from_be_bytes(header[1..3].try_into().unwrap());
+            let data = if b_data_size == 0 {
                 None
             } else {
-                Some(&data[0..(data_size as usize)])
+                Some(&data[0..(b_data_size as usize)])
             };
             Ok(FstpMessage {
-                header: FstpHeader { flag, data_size },
+                header: FstpHeader {
+                    flag,
+                    data_size: b_data_size,
+                },
                 data,
             }) // return implicito
         }
     }
 
     impl Flag {
-        fn to_bytes_flag(&self) -> u8 {
+        fn to_bytes(&self) -> u8 {
             match self {
                 Self::Ok => 1u8,
                 Self::Add => 2u8,
@@ -62,12 +66,12 @@ pub mod fstp {
             }
         }
 
-        fn from_bytes_flag(byte: &u8) -> anyhow::Result<Flag> {
+        fn from_bytes(byte: &u8) -> anyhow::Result<Self> {
             match byte {
                 1 => Ok(Self::Ok),
-                2 => Ok(Flag::Add),
-                3 => Ok(Flag::List),
-                4 => Ok(Flag::File),
+                2 => Ok(Self::Add),
+                3 => Ok(Self::List),
+                4 => Ok(Self::File),
                 _ => bail!("Flag inválida"),
             }
         }
@@ -96,7 +100,7 @@ pub mod file_meta {
             buf
         }
 
-        pub fn from_bytes(bytes: &[u8]) -> FileMeta {
+        pub fn from_bytes(bytes: &[u8]) -> Self {
             let size = u64::from_be_bytes(bytes[0..8].try_into().unwrap());
             let n_blocks = u32::from_be_bytes(bytes[8..12].try_into().unwrap());
             let name = String::from(from_utf8(&bytes[12..]).unwrap());

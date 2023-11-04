@@ -1,12 +1,15 @@
 #![feature(let_chains)]
 
 use anyhow::{Context, bail};
+use local::file_meta::*;
 use local::fstp::*;
 use std::env;
 use std::fs::{read_dir, File, ReadDir};
 use std::io::{Read, Write, stdin,stdout};
 use std::net::{TcpStream, IpAddr, Ipv4Addr, Shutdown};
 use std::str::from_utf8;
+
+const CHUNK_BYTES:u16 = 1420; 
 
 fn main() -> anyhow::Result<()> {
     let mut stream = if let Some(tracker_addr) = env::args().nth(1){
@@ -71,7 +74,7 @@ fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
                     data: Some(f_name.as_bytes())
                 };
                 msg.put_in_bytes(&mut buf)?;
-                stream.write(&mut buf)?;
+                stream.write_all(&mut buf)?;
                 stream.flush()?;
 
                 if stream.read(&mut buf)? == 0 {
@@ -97,17 +100,23 @@ fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
 }
 
 fn contact_tracker(stream:&mut TcpStream) ->anyhow::Result<()> {
-    let shared_files = get_shared_files();
-    let mut data_buffer = [0u8;1000];
-    println!("shared files:\n{}",shared_files);
+    let files_meta = get_files_meta();
+    println!("files meta info:\n{:?}",files_meta);
+    let mut raw_data:Vec<u8> = Vec::new();
+    for f_m in files_meta {
+        let buf = f_m.as_bytes();
+        raw_data.push(buf.len() as u8);
+        raw_data.extend_from_slice(&buf);
+    }
     let msg = FstpMessage {
         header: FstpHeader { 
             flag: Flag::Add,
-            data_size: shared_files.len() as u16 
+            data_size: raw_data.len() as u16 
         },
-        data: Some(shared_files.as_bytes()),
+        data: Some(raw_data.as_slice()) 
     };
   
+    let mut data_buffer = [0u8;1000];
     msg.put_in_bytes(&mut data_buffer)?;
 
     stream.write_all(&data_buffer)?;
@@ -115,8 +124,8 @@ fn contact_tracker(stream:&mut TcpStream) ->anyhow::Result<()> {
     Ok(())
 }
 
-fn get_shared_files() -> String {
-    let mut shared_files = String::new();
+fn get_files_meta() -> Vec<FileMeta> {
+    let mut files_meta = Vec::new();
     let mut config = File::open("./node.config").expect("No config file found");
 
     let mut shared_path = String::new();
@@ -125,22 +134,33 @@ fn get_shared_files() -> String {
         .expect("Inválid path");
 
     let shared_dir: ReadDir =
-        read_dir(shared_path.trim_end()).expect(&format!("failed to read directory: {}",shared_path));
+        read_dir(shared_path.trim_end()).expect(
+            &format!("failed to read directory: {}",shared_path)
+        );
 
     for try_entry in shared_dir {
         let entry = try_entry.expect("failed to read entry");
         let path = entry.path();
 
         if path.is_file() 
-        // && let Some(ext) = path.extension().and_then(|os_ext| os_ext.to_str()) 
+        && let Ok(meta) = entry.metadata() 
         && let Some(name) = path.file_name().and_then(|os_str| os_str.to_str())
-        // && ext == "gush"
-         {
-           shared_files.push_str(&(name.to_owned() + ","));
+        {
+            let size = meta.len();
+            let f_m = FileMeta {
+                size,
+                n_blocks: 
+                if size%CHUNK_BYTES as u64 == 0 {
+                    (size/CHUNK_BYTES as u64) as u32
+                }else {
+                    (size/CHUNK_BYTES as u64 + 1) as u32
+                },
+                name:name.to_string()
+            };
+            files_meta.push(f_m);
         }
     }
-    shared_files.pop();
-    shared_files
+    files_meta
 }
 
 #[derive(Debug)]
@@ -168,11 +188,10 @@ impl PeersWithFile {
         if len % 4 == 0 {
             for i in 0..max_iters {
                 let idx = i*4;
-                let b1 = bytes[idx];
-                let b2 = bytes[idx + 1];
-                let b3 = bytes[idx + 2];
-                let b4 = bytes[idx + 3]; 
-                let peer = IpAddr::V4(Ipv4Addr::new(b1,b2,b3,b4));  
+                let b_ip = u32::from_be_bytes(
+                    bytes[idx..3+idx].try_into().unwrap()
+                );
+                let peer = IpAddr::V4(Ipv4Addr::from(b_ip));  
                 peers.push(peer);
             }
         } else {
