@@ -25,7 +25,7 @@ pub mod fstp {
     }
 
     impl<'a> FstpMessage<'a> {
-        pub fn put_in_bytes(self, buf: &mut [u8]) -> anyhow::Result<()> {
+        pub fn as_bytes(self, buf: &mut [u8]) -> anyhow::Result<()> {
             let flag = &self.header.flag;
             buf[0] = flag.to_bytes();
             let b_data_size: [u8; 2] = self.header.data_size.to_be_bytes();
@@ -79,36 +79,61 @@ pub mod fstp {
 }
 
 pub mod file_meta {
+    use bitvec::prelude::*;
+    use std::io::{Read, Write};
     use std::str::from_utf8;
 
     #[derive(Debug, Clone, Hash)]
     pub struct FileMeta {
-        pub size: u64,
-        pub n_blocks: u32,
+        pub f_size: u64,
+        pub blocks_len: u32,
+        pub name_len: u16,
+        pub blocks: BitVec,
         pub name: String,
     }
 
     impl FileMeta {
-        pub fn as_bytes(self) -> Vec<u8> {
+        pub fn as_bytes(self, _buf: &mut [u8]) -> anyhow::Result<()> {
             let s_bs = self.name.as_bytes();
             let mut buf = Vec::with_capacity(12 + s_bs.len());
-            let b_size = self.size.to_be_bytes();
-            let b_n_blocks = self.size.to_be_bytes();
-            buf[..8].copy_from_slice(&b_size);
-            buf[8..12].copy_from_slice(&b_n_blocks);
-            buf[12..12 + s_bs.len()].copy_from_slice(s_bs);
-            buf
+            let b_f_size = self.f_size.to_be_bytes();
+            let b_blocks_len = self.blocks_len.to_be_bytes();
+            let b_name_len = self.name_len.to_be_bytes();
+            let mut b_blocks_buff = [0u8; 1000];
+            self.blocks.clone().read(&mut b_blocks_buff)?;
+
+            buf[..8].copy_from_slice(&b_f_size);
+            buf[8..12].copy_from_slice(&b_blocks_len);
+            buf[12..14].copy_from_slice(&b_name_len);
+            let blocks_len = self.blocks_len as usize;
+            buf[14..14 + blocks_len]
+                .copy_from_slice(&b_blocks_buff[..blocks_len]);
+            buf[14 + blocks_len..14 + blocks_len + s_bs.len()]
+                .copy_from_slice(s_bs);
+            Ok(())
         }
 
-        pub fn from_bytes(bytes: &[u8]) -> Self {
-            let size = u64::from_be_bytes(bytes[0..8].try_into().unwrap());
-            let n_blocks = u32::from_be_bytes(bytes[8..12].try_into().unwrap());
-            let name = String::from(from_utf8(&bytes[12..]).unwrap());
-            FileMeta {
-                size,
-                n_blocks,
+        pub fn from_bytes(bytes: &[u8]) -> anyhow::Result<Self> {
+            let f_size = u64::from_be_bytes(bytes[0..8].try_into().unwrap());
+            let blocks_len =
+                u32::from_be_bytes(bytes[8..12].try_into().unwrap());
+            let name_len =
+                u16::from_be_bytes(bytes[12..14].try_into().unwrap());
+            let mut blocks = BitVec::new();
+            blocks.write(&bytes[14..14 + blocks_len as usize])?;
+            let name = String::from(
+                from_utf8(
+                    &bytes[14..14 + blocks_len as usize + name_len as usize],
+                )
+                .unwrap(),
+            );
+            Ok(FileMeta {
+                f_size,
+                blocks_len,
+                name_len,
+                blocks,
                 name,
-            }
+            })
         }
     }
     impl PartialEq for FileMeta {

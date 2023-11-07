@@ -19,4 +19,5 @@ path = "src/bin/node.rs"
 
 [dependencies]
 anyhow = "1.0.75"
+bitvec = "1.0.1"
 threadpool = "1.8.1"

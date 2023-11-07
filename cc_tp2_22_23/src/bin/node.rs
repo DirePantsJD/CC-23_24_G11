@@ -102,11 +102,9 @@ fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
 fn contact_tracker(stream:&mut TcpStream) ->anyhow::Result<()> {
     let files_meta = get_files_meta();
     println!("files meta info:\n{:?}",files_meta);
-    let mut raw_data:Vec<u8> = Vec::new();
+    let mut buf = [0u8;1000];
     for f_m in files_meta {
-        let buf = f_m.as_bytes();
-        raw_data.push(buf.len() as u8);
-        raw_data.extend_from_slice(&buf);
+        let buf = f_m.as_bytes(&mut buf).expect("Failed to serialize FM");
     }
     let msg = FstpMessage {
         header: FstpHeader { 
@@ -117,7 +115,7 @@ fn contact_tracker(stream:&mut TcpStream) ->anyhow::Result<()> {
     };
   
     let mut data_buffer = [0u8;1000];
-    msg.put_in_bytes(&mut data_buffer)?;
+    msg.as_bytes(&mut data_buffer)?;
 
     stream.write_all(&data_buffer)?;
     stream.flush()?;
@@ -146,15 +144,17 @@ fn get_files_meta() -> Vec<FileMeta> {
         && let Ok(meta) = entry.metadata() 
         && let Some(name) = path.file_name().and_then(|os_str| os_str.to_str())
         {
-            let size = meta.len();
+            let f_size = meta.len();
             let f_m = FileMeta {
-                size,
-                n_blocks: 
-                if size%CHUNK_BYTES as u64 == 0 {
-                    (size/CHUNK_BYTES as u64) as u32
+                f_size,
+                blocks_len: 
+                if f_size%CHUNK_BYTES as u64 == 0 {
+                    (f_size/CHUNK_BYTES as u64) as u32
                 }else {
-                    (size/CHUNK_BYTES as u64 + 1) as u32
+                    (f_size/CHUNK_BYTES as u64 + 1) as u32
                 },
+                name_len: name.len() as u16,
+                blocks:,
                 name:name.to_string()
             };
             files_meta.push(f_m);
