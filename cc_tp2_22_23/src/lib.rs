@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 
 //TODO: Cenas de DNS
-//TODO: Meta Dados
 pub mod fstp {
     use anyhow::bail;
     #[derive(Debug)]
@@ -86,6 +85,7 @@ pub mod file_meta {
     #[derive(Debug, Clone, Hash)]
     pub struct FileMeta {
         pub f_size: u64,
+        pub has_full_file: bool,
         pub blocks_len: u32,
         pub name_len: u16,
         pub blocks: BitVec,
@@ -94,41 +94,46 @@ pub mod file_meta {
 
     impl FileMeta {
         pub fn as_bytes(self, _buf: &mut [u8]) -> anyhow::Result<()> {
+            let has_ffile = self.has_full_file;
             let s_bs = self.name.as_bytes();
             let mut buf = Vec::with_capacity(12 + s_bs.len());
             let b_f_size = self.f_size.to_be_bytes();
+            let b_has_ff = if has_ffile { [1u8] } else { [0u8] };
             let b_blocks_len = self.blocks_len.to_be_bytes();
             let b_name_len = self.name_len.to_be_bytes();
             let mut b_blocks_buff = [0u8; 1000];
             self.blocks.clone().read(&mut b_blocks_buff)?;
 
             buf[..8].copy_from_slice(&b_f_size);
-            buf[8..12].copy_from_slice(&b_blocks_len);
-            buf[12..14].copy_from_slice(&b_name_len);
+            buf[8..9].copy_from_slice(&b_has_ff);
+            buf[9..13].copy_from_slice(&b_blocks_len);
+            buf[13..15].copy_from_slice(&b_name_len);
             let blocks_len = self.blocks_len as usize;
-            buf[14..14 + blocks_len]
+            buf[15..15 + blocks_len]
                 .copy_from_slice(&b_blocks_buff[..blocks_len]);
-            buf[14 + blocks_len..14 + blocks_len + s_bs.len()]
+            buf[15 + blocks_len..15 + blocks_len + s_bs.len()]
                 .copy_from_slice(s_bs);
             Ok(())
         }
 
         pub fn from_bytes(bytes: &[u8]) -> anyhow::Result<Self> {
             let f_size = u64::from_be_bytes(bytes[0..8].try_into().unwrap());
+            let has_full_file = if bytes[8] == 1 { true } else { false };
             let blocks_len =
-                u32::from_be_bytes(bytes[8..12].try_into().unwrap());
+                u32::from_be_bytes(bytes[9..13].try_into().unwrap());
             let name_len =
-                u16::from_be_bytes(bytes[12..14].try_into().unwrap());
+                u16::from_be_bytes(bytes[13..15].try_into().unwrap());
             let mut blocks = BitVec::new();
-            blocks.write(&bytes[14..14 + blocks_len as usize])?;
+            blocks.write(&bytes[15..15 + blocks_len as usize])?;
             let name = String::from(
                 from_utf8(
-                    &bytes[14..14 + blocks_len as usize + name_len as usize],
+                    &bytes[15..15 + blocks_len as usize + name_len as usize],
                 )
                 .unwrap(),
             );
             Ok(FileMeta {
                 f_size,
+                has_full_file,
                 blocks_len,
                 name_len,
                 blocks,

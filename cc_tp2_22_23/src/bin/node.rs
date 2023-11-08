@@ -43,7 +43,7 @@ fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
                     header: FstpHeader { flag: Flag::List, data_size:0 },
                     data:None,
                 };
-                msg.put_in_bytes(&mut buf)?;
+                msg.as_bytes(&mut buf)?;
                 stream.write_all(&buf)?;
                 stream.flush()?;
 
@@ -73,7 +73,7 @@ fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
                     },
                     data: Some(f_name.as_bytes())
                 };
-                msg.put_in_bytes(&mut buf)?;
+                msg.as_bytes(&mut buf)?;
                 stream.write_all(&mut buf)?;
                 stream.flush()?;
 
@@ -102,9 +102,12 @@ fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
 fn contact_tracker(stream:&mut TcpStream) ->anyhow::Result<()> {
     let files_meta = get_files_meta();
     println!("files meta info:\n{:?}",files_meta);
-    let mut buf = [0u8;1000];
+    let mut buf = [0u8;100];
+    let mut raw_data = Vec::with_capacity(1000);
+    let prev_len = 0;
     for f_m in files_meta {
-        let buf = f_m.as_bytes(&mut buf).expect("Failed to serialize FM");
+        f_m.as_bytes(&mut buf).expect("Failed to serialize FM");
+        raw_data.extend_from_slice(&buf);
     }
     let msg = FstpMessage {
         header: FstpHeader { 
@@ -114,10 +117,10 @@ fn contact_tracker(stream:&mut TcpStream) ->anyhow::Result<()> {
         data: Some(raw_data.as_slice()) 
     };
   
-    let mut data_buffer = [0u8;1000];
-    msg.as_bytes(&mut data_buffer)?;
+    let mut msg_buffer = [0u8;2000];
+    msg.as_bytes(&mut msg_buffer)?;
 
-    stream.write_all(&data_buffer)?;
+    stream.write_all(&msg_buffer)?;
     stream.flush()?;
     Ok(())
 }
@@ -139,7 +142,7 @@ fn get_files_meta() -> Vec<FileMeta> {
     for try_entry in shared_dir {
         let entry = try_entry.expect("failed to read entry");
         let path = entry.path();
-
+        //TODO: Caso ser pasta
         if path.is_file() 
         && let Ok(meta) = entry.metadata() 
         && let Some(name) = path.file_name().and_then(|os_str| os_str.to_str())
@@ -147,14 +150,15 @@ fn get_files_meta() -> Vec<FileMeta> {
             let f_size = meta.len();
             let f_m = FileMeta {
                 f_size,
-                blocks_len: 
-                if f_size%CHUNK_BYTES as u64 == 0 {
-                    (f_size/CHUNK_BYTES as u64) as u32
-                }else {
-                    (f_size/CHUNK_BYTES as u64 + 1) as u32
-                },
+                has_full_file: true,
+                blocks_len: 0,
+                // if f_size%CHUNK_BYTES as u64 == 0 {
+                //     (f_size/CHUNK_BYTES as u64) as u32
+                // }else {
+                //     (f_size/CHUNK_BYTES as u64 + 1) as u32
+                // },
                 name_len: name.len() as u16,
-                blocks:,
+                blocks: [],
                 name:name.to_string()
             };
             files_meta.push(f_m);

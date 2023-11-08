@@ -163,7 +163,7 @@ fn list(
         data: Some(data.as_bytes()),
     };
 
-    list_msg.put_in_bytes(buffer)?;
+    list_msg.as_bytes(buffer)?;
     stream.write_all(buffer)?;
     stream.flush()?;
     Ok(())
@@ -200,7 +200,7 @@ fn file(
                 data: Some(ips_bytes.as_slice()),
             };
             println!("Pre send:{:?}", resp);
-            resp.put_in_bytes(buffer)?;
+            resp.as_bytes(buffer)?;
             stream.write_all(buffer)?;
             stream.flush()?;
         }
