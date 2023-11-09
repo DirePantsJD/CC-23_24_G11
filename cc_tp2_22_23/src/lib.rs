@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+pub mod partial_file;
+
 //TODO: Cenas de DNS
 //TODO: Meta Dados
 pub mod fstp {
