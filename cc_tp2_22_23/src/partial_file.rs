@@ -1,4 +1,4 @@
-use anyhow::{Ok, Result};
+use anyhow::{bail, Ok, Result};
 use std::fs;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom, Write};
@@ -42,11 +42,26 @@ pub fn complete_part_file(
     block_size: u32,
 ) -> Result<()> {
     let mut file_name = partial_file_name.to_owned();
+
     if file_name.ends_with(".part") {
-        file_name.truncate(file_name.len() - 5);
-        fs::rename(partial_file_name, file_name.clone())?;
-        let file = File::open(format!("{}.part", file_name))?;
-        file.set_len((block_len * block_size).into())?;
+        let mut file = File::open(partial_file_name)?;
+        let mut last_bytes = vec![0; block_len as usize];
+
+        file.seek(SeekFrom::End(-(block_len as i64)))?;
+        file.read_exact(&mut last_bytes)?;
+
+        if last_bytes.iter().all(|b| *b == b'1') {
+            // remove last block_len bytes (remove metadata)
+            file.set_len((block_len * block_size).into())?;
+
+            // remove .part extension
+            file_name.truncate(file_name.len() - 5);
+            fs::rename(partial_file_name, file_name.clone())?;
+        } else {
+            bail!("File is not complete");
+        }
+    } else {
+        bail!("File is not a partial file");
     }
     Ok(())
 }
