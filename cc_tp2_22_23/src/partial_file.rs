@@ -93,7 +93,7 @@ pub fn write_block(
     Ok(())
 }
 
-/// Reads a block from a file at a given index.
+/// Reads a block from a partial file at a given block index.
 ///
 /// # Arguments
 ///
@@ -106,7 +106,7 @@ pub fn write_block(
 /// # Returns
 ///
 /// Returns `Ok(())` if the operation was successful,  otherwise returns an `anyhow::Error`.
-pub fn read_block(
+pub fn read_block_from_part_file(
     file: &mut File,
     block_len: u32,
     block_size: u32,
@@ -122,5 +122,28 @@ pub fn read_block(
     } else {
         bail!("Block is not available");
     }
+    Ok(())
+}
+
+/// Reads a block from a complete file at a given index.
+///
+/// # Arguments
+///
+/// * `file` - A mutable reference to the file to read from.
+/// * `block_size` - The size of the blocks in the file.
+/// * `block_index` - The index of the block to be read.
+/// * `block` - A mutable reference to a byte slice to store the read block.
+///
+/// # Returns
+///
+/// Returns `Ok(())` if the operation was successful,  otherwise returns an `anyhow::Error`.
+pub fn read_block_from_complete_file(
+    file: &mut File,
+    block_size: u32,
+    block_index: u32,
+    block: &mut [u8],
+) -> Result<()> {
+    file.seek(SeekFrom::Start((block_index * block_size).into()))?;
+    file.read_exact(block)?;
     Ok(())
 }
