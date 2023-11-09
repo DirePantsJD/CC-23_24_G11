@@ -98,8 +98,9 @@ pub fn write_block(
 /// # Arguments
 ///
 /// * `file` - A mutable reference to the file to read from.
-/// * `block_index` - The index of the block to be read.
+/// * `block_len` - An unsigned 32-bit integer that holds the number of files.
 /// * `block_size` - The size of the blocks in the file.
+/// * `block_index` - The index of the block to be read.
 /// * `block` - A mutable reference to a byte slice to store the read block.
 ///
 /// # Returns
@@ -107,11 +108,19 @@ pub fn write_block(
 /// Returns `Ok(())` if the operation was successful,  otherwise returns an `anyhow::Error`.
 pub fn read_block(
     file: &mut File,
-    block_index: u32,
+    block_len: u32,
     block_size: u32,
+    block_index: u32,
     block: &mut [u8],
 ) -> Result<()> {
-    file.seek(SeekFrom::Start((block_index * block_size).into()))?;
-    file.read_exact(block)?;
+    file.seek(SeekFrom::End((block_index - block_len).into()))?;
+    let mut buffer = [0; 1];
+    file.read_exact(&mut buffer)?;
+    if buffer[0] == b'1' {
+        file.seek(SeekFrom::Start((block_index * block_size).into()))?;
+        file.read_exact(block)?;
+    } else {
+        bail!("Block is not available");
+    }
     Ok(())
 }
