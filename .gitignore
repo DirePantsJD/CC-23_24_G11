@@ -16,3 +16,7 @@ Cargo.lock
 *.pdb
 #node config
 node.config
+
+# VSCode settings
+.vscode
+
