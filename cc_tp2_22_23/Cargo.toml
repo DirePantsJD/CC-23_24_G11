@@ -10,13 +10,14 @@ path = "src/lib.rs"
 
 [[bin]]
 name = "tracker"
-path = "src/tracker.rs"
+path = "src/bin/tracker.rs"
 
 
 [[bin]]
 name = "node"
-path = "src/node.rs"
+path = "src/bin/node.rs"
 
 [dependencies]
 anyhow = "1.0.75"
+bitvec = "1.0.1"
 threadpool = "1.8.1"
