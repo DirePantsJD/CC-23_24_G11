@@ -81,10 +81,11 @@ pub mod fstp {
 
 pub mod file_meta {
     use bitvec::prelude::*;
+    use std::hash::{Hash, Hasher};
     use std::io::{Read, Write};
     use std::str::from_utf8;
 
-    #[derive(Debug, Clone, Hash)]
+    #[derive(Debug, Clone)]
     pub struct FileMeta {
         pub f_size: u64,
         pub has_full_file: bool,
@@ -150,6 +151,12 @@ pub mod file_meta {
         }
     }
     impl Eq for FileMeta {}
+
+    impl Hash for FileMeta {
+        fn hash<H: Hasher>(&self, state: &mut H) {
+            self.name.hash(state);
+        }
+    }
 }
 
 pub mod peers_with_blocks {
