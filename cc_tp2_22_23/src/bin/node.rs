@@ -151,7 +151,7 @@ fn get_files_meta() -> Vec<FileMeta> {
     for try_entry in shared_dir {
         let entry = try_entry.expect("failed to read entry");
         let path = entry.path();
-        //TODO: Caso ser pasta
+
         if path.is_file() 
         && let Ok(meta) = entry.metadata() 
         && let Some(name) = path.file_name().and_then(|os_str| os_str.to_str())
