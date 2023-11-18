@@ -1,12 +1,18 @@
 #![feature(let_chains)]
 
 use anyhow::{Context, bail};
+use local::file_meta::*;
 use local::fstp::*;
+use local::peers_with_blocks::*;
+use bitvec::prelude::*;
+use std::collections::HashSet;
 use std::env;
 use std::fs::{read_dir, File, ReadDir};
 use std::io::{Read, Write, stdin,stdout};
-use std::net::{TcpStream, IpAddr, Ipv4Addr, Shutdown};
+use std::net::{TcpStream,Shutdown};
 use std::str::from_utf8;
+
+// const CHUNK_BYTES:u16 = 1420; 
 
 fn main() -> anyhow::Result<()> {
     let mut stream = if let Some(tracker_addr) = env::args().nth(1){
@@ -24,8 +30,7 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
-    let mut files: Vec<String> = Vec::new();
-    let mut file_peers = PeersWithFile::new(); 
+    let mut files: HashSet<String> = HashSet::new();
     loop {
         let mut buf = [0u8;1000];
         let mut raw_command = String::new();
@@ -40,8 +45,8 @@ fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
                     header: FstpHeader { flag: Flag::List, data_size:0 },
                     data:None,
                 };
-                msg.put_in_bytes(&mut buf)?;
-                stream.write_all(&buf)?;
+                let msg_size = msg.as_bytes(&mut buf)?;
+                stream.write_all(&buf[..msg_size])?;
                 stream.flush()?;
 
                 if stream.read(&mut buf)? == 0 {
@@ -53,7 +58,7 @@ fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
                 if let Some(data) = response.data {
                     let list = from_utf8(data).unwrap().split(|c| c == ',');
                     for f in list {
-                        files.push(String::from(f));
+                        files.insert(String::from(f));
                     }
                 }
                 println!("files:{:#?}",files);
@@ -63,28 +68,31 @@ fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
                 stdout().write_all("Input file name\n".as_bytes())?;
                 stdout().flush()?;
                 stdin().read_line(&mut f_name)?;                
-                let msg = FstpMessage {
-                    header: FstpHeader { 
-                        flag: Flag::File,
-                        data_size:f_name.len() as u16
-                    },
-                    data: Some(f_name.as_bytes())
-                };
-                msg.put_in_bytes(&mut buf)?;
-                stream.write(&mut buf)?;
-                stream.flush()?;
 
-                if stream.read(&mut buf)? == 0 {
-                    bail!("Server no longer reachable");
-                } 
+                if files.iter().any(|str| str == &f_name.trim_end()) {
+                    let msg = FstpMessage {
+                        header: FstpHeader { 
+                            flag: Flag::File,
+                            data_size:f_name.len() as u16
+                        },
+                        data: Some(f_name.as_bytes())
+                    };
+                    let msg_size = msg.as_bytes(&mut buf)?;
+                    stream.write_all(&mut buf[..msg_size])?;
+                    stream.flush()?;
+    
                 
-                let resp = FstpMessage::from_bytes(&buf)?;
-                println!("resp:{:?}",resp);
-                if let Some(data) = resp.data {
-                    file_peers.set_name(&f_name.trim_end());
-                    file_peers.set_peers_from_bytes(data)?;
+                    if stream.read(&mut buf)? == 0 {
+                        bail!("Server no longer reachable");
+                    } 
+                
+                    let resp = FstpMessage::from_bytes(&buf)?;
+                    println!("resp:{:?}",resp);
+                    if let Some(data) = resp.data {
+                        let peers_with_file = PeersWithFile::from_bytes(data)?;
+                        println!("p_w_f:{:?}",peers_with_file);
+                    }
                 }
-                println!("{:?}",file_peers);
             }
             "exit" => {
                 stream.shutdown(Shutdown::Both)?;
@@ -97,26 +105,37 @@ fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
 }
 
 fn contact_tracker(stream:&mut TcpStream) ->anyhow::Result<()> {
-    let shared_files = get_shared_files();
-    let mut data_buffer = [0u8;1000];
-    println!("shared files:\n{}",shared_files);
+    let files_meta = get_files_meta();
+    let mut fm_buf = [0u8;100];
+    let mut raw_data = [0u8;1000];
+    let mut data_size = 0;
+    let mut prev_ds = 0;
+
+    for f_m in files_meta {
+        let fm_size = f_m.as_bytes(&mut fm_buf).expect("Failed to serialize FM");
+        data_size+=fm_size;
+        raw_data[prev_ds..data_size].copy_from_slice(&fm_buf[..fm_size]);
+        prev_ds = data_size;
+    }
     let msg = FstpMessage {
         header: FstpHeader { 
             flag: Flag::Add,
-            data_size: shared_files.len() as u16 
+            data_size: data_size as u16 
         },
-        data: Some(shared_files.as_bytes()),
+        data: Some(&raw_data.as_slice()[..data_size]) 
     };
+    println!("{:#?}",msg);
   
-    msg.put_in_bytes(&mut data_buffer)?;
+    let mut msg_buffer = [0u8;2000];
+    let msg_size = msg.as_bytes(&mut msg_buffer)?;
 
-    stream.write_all(&data_buffer)?;
+    stream.write_all(&msg_buffer[..msg_size])?;
     stream.flush()?;
     Ok(())
 }
 
-fn get_shared_files() -> String {
-    let mut shared_files = String::new();
+fn get_files_meta() -> Vec<FileMeta> {
+    let mut files_meta = Vec::new();
     let mut config = File::open("./node.config").expect("No config file found");
 
     let mut shared_path = String::new();
@@ -125,59 +144,30 @@ fn get_shared_files() -> String {
         .expect("Inválid path");
 
     let shared_dir: ReadDir =
-        read_dir(shared_path.trim_end()).expect(&format!("failed to read directory: {}",shared_path));
+        read_dir(shared_path.trim_end()).expect(
+            &format!("failed to read directory: {}",shared_path)
+        );
 
     for try_entry in shared_dir {
         let entry = try_entry.expect("failed to read entry");
         let path = entry.path();
 
         if path.is_file() 
-        // && let Some(ext) = path.extension().and_then(|os_ext| os_ext.to_str()) 
+        && let Ok(meta) = entry.metadata() 
         && let Some(name) = path.file_name().and_then(|os_str| os_str.to_str())
-        // && ext == "gush"
-         {
-           shared_files.push_str(&(name.to_owned() + ","));
+        {
+            let f_size = meta.len();
+            let f_m = FileMeta {
+                f_size,
+                has_full_file: true,
+                blocks_len: 0,
+                name_len: name.len() as u16,
+                blocks: BitVec::<u8,Msb0>::new(),
+                name:name.to_string()
+            };
+            files_meta.push(f_m);
         }
     }
-    shared_files.pop();
-    shared_files
+    files_meta
 }
 
-#[derive(Debug)]
-struct PeersWithFile {
-    name: String,
-    peers: Vec<IpAddr>,
-}
-
-impl PeersWithFile {
-    pub fn new() -> Self {
-        PeersWithFile {
-            name: String::new(),
-            peers: Vec::new(),
-        }
-    }
-     pub fn set_name(&mut self,str:&str) {
-        self.name.push_str(str);
-    }
-
-    pub fn set_peers_from_bytes(&mut self,bytes: &[u8]) -> anyhow::Result<()>{
-        let peers = &mut self.peers;
-        let len = bytes.len();
-        println!("{}",len);
-        let max_iters = len/4;
-        if len % 4 == 0 {
-            for i in 0..max_iters {
-                let idx = i*4;
-                let b1 = bytes[idx];
-                let b2 = bytes[idx + 1];
-                let b3 = bytes[idx + 2];
-                let b4 = bytes[idx + 3]; 
-                let peer = IpAddr::V4(Ipv4Addr::new(b1,b2,b3,b4));  
-                peers.push(peer);
-            }
-        } else {
-            bail!("Corrupted addresses")
-        }
-        Ok(())
-    }
-}
