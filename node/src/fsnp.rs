@@ -19,13 +19,14 @@
 use anyhow::bail;
 
 pub const MAX_PACKET_SIZE:usize = 1453;
+pub const MAX_CHUNK_SIZE:usize = 1420;
 
 pub struct Protocol<'a>{
     pub action:u8,
     pub chunk_id:u32,
     pub filename:&'a str,
     pub len_chunk:u16,
-    pub chunk_data:&'a [u8],
+    pub chunk_data:[u8;MAX_CHUNK_SIZE],
 }
 
 impl< 'a> Protocol<'a>{
@@ -44,6 +45,14 @@ impl< 'a> Protocol<'a>{
         let len_c:u16 = u16::from_le_bytes(field3);
 
         let byte_chunk_data:usize = 8+len_filename as usize+1;
+
+        let mut data:[u8;MAX_CHUNK_SIZE] = [0;MAX_CHUNK_SIZE];
+        let mut i:usize=0;
+        for byte in &packet[byte_chunk_data..(byte_chunk_data+len_c as usize+1)]{
+            data[i]=byte.clone();
+            i+=1;
+        }
+        
         match std::str::from_utf8(&packet[8..byte_chunk_data]){
             Ok(f) => {
                 Ok(Protocol{
@@ -51,7 +60,7 @@ impl< 'a> Protocol<'a>{
                     chunk_id: u32::from_le_bytes(field2),
                     len_chunk: len_c,
                     filename: f,
-                    chunk_data: &packet[byte_chunk_data..(byte_chunk_data+len_c as usize+1)]
+                    chunk_data: data,
                 })
             }
             Err(_) => bail!("Failed parsing filename"),
@@ -81,6 +90,24 @@ impl< 'a> Protocol<'a>{
 
         Some((packet,packet_len))
     } 
+
+    pub fn clone(&self) -> Protocol{
+        let mut data:[u8;MAX_CHUNK_SIZE] = [0;MAX_CHUNK_SIZE];
+
+        let mut i:usize=0;
+        for byte in self.chunk_data{
+            data[i] = byte.clone();
+            i+=1;
+        }        
+        
+        Protocol{
+            action:self.action,
+            chunk_id:self.chunk_id,
+            filename:self.filename,
+            len_chunk:self.len_chunk,
+            chunk_data:data,
+        }
+    }
 }
 
 pub fn overwrite_array(index_ini:usize,index_fini:usize,src:&[u8],dest:&mut [u8]){

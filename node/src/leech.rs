@@ -1,6 +1,6 @@
-use std::collections::{HashMap,HashSet};
+use std::collections::HashSet;
 use std::net::{IpAddr, UdpSocket, SocketAddr};
-use std::io::{Error, ErrorKind};
+use std::io::ErrorKind;
 use anyhow;
 
 mod shared;
@@ -44,7 +44,7 @@ fn request_chunk(peer_ip:IpAddr,local_socket:&UdpSocket,chunkID:u32,filename:Str
 		chunk_id:chunkID,
 		filename:&filename,
 		len_chunk:0,
-		chunk_data:&[],
+		chunk_data:[0;fsnp::MAX_CHUNK_SIZE],
 	}.build_packet();
 
 	match p{
@@ -58,108 +58,96 @@ fn request_chunk(peer_ip:IpAddr,local_socket:&UdpSocket,chunkID:u32,filename:Str
 	}
 }
 
-fn stop_wait(thread_socket:&UdpSocket,data:&mut Shared) -> (u32,bool){
+fn stop_wait(thread_socket:&UdpSocket,data:&mut Shared) -> anyhow::Result<(u32,bool)>{
 	let next_chunk_id = data.next_index;
-	let mut picked:HashSet<IpAddr> = HashSet::new();
 	data.next_index+=1;
+
+	let mut picked:HashSet<IpAddr> = HashSet::new();
 	let mut reply:[u8;1500] = [0;1500];
+	let mut request:anyhow::Result<()> = Ok(());
+	
 	let mut retries = 0;
 	let mut resend = true;
-	let mut r:anyhow::Result<()> = Ok(());
-	
-	loop{
-		let peer_ip:IpAddr = if let Some(ip) = peer_picker(&data.peers_to_chunk[&next_chunk_id],&picked,data){
-			ip
-		} else{
-			return (next_chunk_id,false)
-		};
+	let mut fetch_peer:bool = true;
+	let mut peer_ip:IpAddr = thread_socket.local_addr()?.ip();
 
-		loop{
-			if resend{
-				r = request_chunk(peer_ip,thread_socket,next_chunk_id,data.filename.clone());
+	loop{
+		if fetch_peer{
+			if let Some(ip) = peer_picker(&data.peers_to_chunk[&next_chunk_id],&picked,data){
+				peer_ip = ip;
 			}
-				
-			match r {
-				Ok(()) => {
-					match thread_socket.recv_from(&mut reply){
-						Ok((len,source)) =>{
-							if ok_handler(len,source,&reply,&mut resend,&thread_socket,next_chunk_id){
-								return (next_chunk_id,true);
-							}else{
-								continue;
+			else{
+				return Ok((next_chunk_id,false))
+			}
+			fetch_peer = false;
+		}
+
+		if resend{
+			request = request_chunk(peer_ip,thread_socket,next_chunk_id,data.filename.clone());
+		}
+
+		if let Ok(()) = request {
+			match thread_socket.recv_from(&mut reply){
+				Ok((len,source))=>{
+					if let Ok(mut packet) = fsnp::Protocol::read_packet(&reply,len as u16){
+						if let Ok(()) = send_ack(&thread_socket,packet.clone(),source){
+							if packet.chunk_id == next_chunk_id{
+								write_chunk(packet);
+								return Ok((next_chunk_id,true));
 							}
-						},
-						Err(e) => {
-							match e.kind(){
-								ErrorKind::TimedOut =>{
-									resend = true;
-									if retries==3{
-										retries = 0;
-										picked.insert(peer_ip);
-										break;
-									} else{
-										retries+=1;
-										continue;
-									}
-								},
-								_ => return (next_chunk_id,false),
-							}
-					
-						},
+							resend = false;
+						}
+					}
+					// bad packet; failed parsing
+					else{
+						resend = true;						
 					}
 				},
-				//IDK WHAT TO DO HERE YET MAYBE DIS
-				Err(_) => {resend = true},
-			}
-		}		
+				// socket receive timeout => retry mechanism
+				Err(e)=>{
+					match e.kind(){
+						ErrorKind::TimedOut=>{
+							if retries==3{
+								retries = 0;
+								fetch_peer = true;
+								picked.insert(peer_ip);
+							}
+							else{
+								retries+=1;
+							}
+							resend = true;
+						},
+						//Handle other errors
+						_=>{
+							return Ok((next_chunk_id,false));
+						}
+					}
+				},
+			}	
+		}
+		// failed send request
+		else{
+			resend = true;
+		}
 	}
 }
-
-fn ok_handler(len:usize,source:SocketAddr,buffer:&[u8],resend:&mut bool,thread_socket:&UdpSocket,next_chunk_id:u32) -> bool{
-	if let Ok(mut packet) = fsnp::Protocol::read_packet(&buffer,len as u16){
-		packet.action = 0;
-		let (ack_reply,len) = packet.build_packet().unwrap();
-
-		if let Err(_) = thread_socket.send_to(&ack_reply[0..len as usize],source){
-			*resend = true;
-			return false;
-		}
-
-		if packet.chunk_id!=next_chunk_id{
-			*resend = false;
-			return false;
-		}else{
-			write_chunk(packet);
-			return true;
-		}
-	} else{
-		false
-	}
-}
-
-// fn err_handler(e:anyhow::Result<()>,resend:&bool,retries:&i32,picked:&HashSet<IpAddr>,peer_ip:IpAddr) -> bool{
-// 	match e.kind(){
-// 		ErrorKind::TimedOut =>{
-// 			*resend = true;
-// 			if retries==3{
-// 				retries = 0;
-// 				picked.insert(peer_ip);
-// 				break;
-// 			}else{
-// 				retries+=1;
-// 				continue;
-// 			}
-// 		},
-// 		_ => return (next_chunk_id,false),
-// 	}
-// }
-
-
-
 
 // PLACEHOLDER
 fn write_chunk(packet:fsnp::Protocol){
 	
+}
+
+fn send_ack(local_socket:&UdpSocket,mut peer_response:fsnp::Protocol,peer:SocketAddr) -> anyhow::Result<()>{
+	peer_response.action = 0;
+	peer_response.len_chunk = 0;
+	peer_response.chunk_data=[0;fsnp::MAX_CHUNK_SIZE];
+	
+	if let Some((ack,len)) = peer_response.build_packet(){
+		if let Ok(_) = local_socket.send_to(&ack[0..len as usize],peer){
+			()
+		}
+	}
+	anyhow::bail!("Error sending or building ack")
 }
 
 
