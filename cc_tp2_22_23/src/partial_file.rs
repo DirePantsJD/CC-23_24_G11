@@ -87,7 +87,7 @@ pub fn complete_part_file(
 ///
 /// # Arguments
 ///
-/// * `file` - A mutable reference to the file to write to.
+/// * `file_path` - A reference to a str with the path of the file to write to.
 /// * `block_len` - An unsigned 32-bit integer that holds the number of files.
 /// * `block_size` - The size of the blocks in the file.
 /// * `block_index` - The index of the block to be written.
@@ -97,12 +97,14 @@ pub fn complete_part_file(
 ///
 /// Returns `Ok(())` if the write was successful, otherwise returns an `anyhow::Error`.
 pub fn write_block(
-    file: &mut File,
+    file_path: &str,
     block_len: u32,
     block_size: u32,
     block_index: u32,
     block: &[u8],
 ) -> Result<()> {
+    let mut file = File::open(file_path)?;
+
     // write chunk
     file.seek(SeekFrom::Start((block_index * block_size).into()))?;
     file.write_all(block)?;
