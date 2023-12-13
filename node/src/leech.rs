@@ -167,7 +167,7 @@ fn stop_wait(thread_socket:&UdpSocket,data_rwl:&Arc<RwLock<Shared>>,filename:&St
 
 // PLACEHOLDER
 fn write_chunk(packet:fsnp::Protocol){
-	
+	todo!()
 }
 
 fn send_ack(local_socket:&UdpSocket,mut peer_response:fsnp::Protocol,peer:SocketAddr) -> anyhow::Result<()>{
@@ -212,23 +212,18 @@ fn spawn(filename:String,ip:String,data:Arc<RwLock<Shared>>,chunks_received:Arc<
 	chunks_failed:Arc<RwLock<HashSet<u32>>>,max_id:u32) -> thread::JoinHandle<()>
 {
 	let t_handler = thread::spawn(move ||{
-		let t_data= data;
-		let t_received = chunks_received;
-		let t_failed = chunks_failed;
-		let t_fname = filename;
-		
 		if let Ok(socket)= UdpSocket::bind(ip+":0"){
 			loop{
-				match stop_wait(&socket,&t_data,&t_fname){
+				match stop_wait(&socket,&data,&filename){
 					Ok((id,success))=>{
 						if id==max_id{
 							break;
 						}
 						else{
 							let target = if success{
-								&t_received
+								&chunks_received
 							} else{
-								&t_failed	
+								&chunks_failed
 							};
 							
 							if let Ok(mut aquired) = target.write(){
