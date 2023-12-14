@@ -4,6 +4,7 @@ use anyhow::{Context, bail};
 use local::file_meta::*;
 use local::fstp::*;
 use local::peers_with_blocks::*;
+use local::leech::download_file;
 use bitvec::prelude::*;
 use std::collections::HashSet;
 use std::env;
@@ -91,6 +92,9 @@ fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
                     if let Some(data) = resp.data {
                         let peers_with_file = PeersWithFile::from_bytes(data)?;
                         println!("p_w_f:{:?}",peers_with_file);
+                        //TODO: download files
+                        download_file(f_name, peers_with_file.peers_with_blocks);
+
                     }
                 }
             }
