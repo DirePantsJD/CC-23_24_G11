@@ -161,7 +161,7 @@ fn stop_wait(
                                     packet.chunk_id,
                                     &packet.chunk_data,
                                 ) {
-                                    //TODO: meter ACK
+                                    //TODO: dizer ao tracker que tem chunk
                                     return Ok((next_chunk_id, true));
                                 } else {
                                     resend = true;
