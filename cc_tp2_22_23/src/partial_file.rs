@@ -1,13 +1,15 @@
-use anyhow::{bail, Error, Ok, Result};
+use anyhow::{bail, Ok, Result};
 use bitvec::order::Msb0;
 use bitvec::vec::BitVec;
-use std::fs;
+use std::char::MAX;
 use std::fs::File;
+use std::fs::{self, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::mem::size_of;
 use std::path::PathBuf;
 
 use crate::file_meta::FileMeta;
+use crate::fsnp::MAX_CHUNK_SIZE;
 
 /// Creates a partial file with the given `file_name` and `file_size`.
 /// The file is created with the extension `.part`.
@@ -16,7 +18,7 @@ use crate::file_meta::FileMeta;
 ///
 /// * `file_name` - A string slice that holds the name of the file to be created.
 /// * `file_size` - An unsigned 32-bit integer that holds the size of the file.
-/// * `block_len` - An unsigned 32-bit integer that holds the number of blocks in a file.
+/// * `n_blocks` - An unsigned 32-bit integer that holds the number of blocks in a file.
 ///
 /// # Returns
 ///
@@ -24,14 +26,18 @@ use crate::file_meta::FileMeta;
 pub fn create_part_file(
     file_name: &str,
     file_size: u32,
-    block_len: u32,
+    n_blocks: u32,
 ) -> Result<File> {
-    let file = File::create(format!("{}.part", file_name))?;
+    let file = OpenOptions::new()
+        .create(true)
+        .read(true)
+        .write(true)
+        .open(format!(".{}.part", file_name))?;
     file.set_len(
         (file_size
-            + block_len
-            + size_of::<u16>() as u32
-            + size_of::<u32>() as u32)
+            + n_blocks
+            + size_of::<u16>() as u32 //size of last block
+            + size_of::<u32>() as u32) // n_blocks
             .into(),
     )?;
     Ok(file)
@@ -97,25 +103,22 @@ pub fn complete_part_file(
 ///
 /// Returns `Ok(())` if the write was successful, otherwise returns an `anyhow::Error`.
 pub fn write_block(
-    file_path: &str,
-    block_len: u32,
+    file: &mut File,
+    n_blocks: u32,
     block_size: u32,
     block_index: u32,
     block: &[u8],
 ) -> Result<()> {
-    let mut file = File::open(file_path)?;
-
     // write chunk
     file.seek(SeekFrom::Start((block_index * block_size).into()))?;
     file.write_all(block)?;
 
     // mark chunk as written in file metadata
     file.seek(SeekFrom::End(
-        (block_index
-            - block_len
-            - size_of::<u16>() as u32
-            - size_of::<u32>() as u32)
-            .into(),
+        block_index as i64
+            - n_blocks as i64
+            - size_of::<u16>() as i64
+            - size_of::<u32>() as i64,
     ))?;
     file.write_all(&[b'1'])?;
     Ok(())
@@ -126,7 +129,7 @@ pub fn write_block(
 /// # Arguments
 ///
 /// * `file` - A mutable reference to the file to read from.
-/// * `block_len` - An unsigned 32-bit integer that holds the number of files.
+/// * `nblock_len` - An unsigned 32-bit integer that holds the number of block.
 /// * `block_size` - The size of the blocks in the file.
 /// * `block_index` - The index of the block to be read.
 /// * `block` - A mutable reference to a byte slice to store the read block.
@@ -136,7 +139,7 @@ pub fn write_block(
 /// Returns `Ok(())` if the operation was successful,  otherwise returns an `anyhow::Error`.
 pub fn read_block_from_part_file(
     file: &mut File,
-    block_len: u32,
+    n_blocks: u32,
     block_size: u32,
     block_index: u32,
     block: &mut [u8],
@@ -144,7 +147,7 @@ pub fn read_block_from_part_file(
     // verify, in file metadata, if block was already written
     file.seek(SeekFrom::End(
         (block_index
-            - block_len
+            - n_blocks
             - size_of::<u16>() as u32
             - size_of::<u32>() as u32)
             .into(),
@@ -155,7 +158,7 @@ pub fn read_block_from_part_file(
     if buffer[0] == b'1' {
         // write block
         file.seek(SeekFrom::Start((block_index * block_size).into()))?;
-        // ! DALTA TER EM CONTA A POSSIBILIDADE DE SER O ULTIMO BLOCO
+        // ! FALTA TER EM CONTA A POSSIBILIDADE DE SER O ULTIMO BLOCO
         let n = file.read(block)?;
         Ok(n)
     } else {
@@ -308,5 +311,63 @@ pub fn get_file_metadata(path: &PathBuf) -> Result<FileMeta> {
             blocks: BitVec::<u8, Msb0>::new(),
             name: name.to_string(),
         })
+    }
+}
+
+fn read_file(
+    file_name: &str,
+    block_index: u32,
+    block_buf: &mut [u8],
+) -> anyhow::Result<usize> {
+    let mut file = File::open(file_name).unwrap();
+    let file_size = file.metadata().unwrap().len();
+    let mut block_size = MAX_CHUNK_SIZE as u32;
+    let n_blocks = if file_size % MAX_CHUNK_SIZE as u64 == 0 {
+        (file_size / MAX_CHUNK_SIZE as u64) as u32
+    } else {
+        block_size = (file_size % MAX_CHUNK_SIZE as u64) as u32;
+        (file_size / MAX_CHUNK_SIZE as u64 + 1) as u32
+    };
+    if file_name.ends_with(".part") {
+        read_block_from_part_file(
+            &mut file,
+            n_blocks,
+            block_size,
+            block_index,
+            block_buf,
+        )
+    } else {
+        read_block_from_complete_file(
+            &mut file,
+            block_size,
+            block_index,
+            block_buf,
+        )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // #[test]
+    // fn create_pfile_t() {
+    //     create_part_file("test_pfile", 1000, 100).unwrap(); //Works
+    // }
+
+    #[test]
+    fn create_write_read_test() {
+        let mut file = create_part_file("test_pfile", 1000, 100).unwrap(); //Works
+        let block99 = b"Working???";
+        let block00 = b"Is this...";
+        let block49 = b"even rly..";
+        write_block(&mut file, 100, 10, 99, block99).unwrap();
+        write_block(&mut file, 100, 10, 0, block00).unwrap();
+        write_block(&mut file, 100, 10, 49, block49).unwrap();
+        let read_buf = &mut [0; 10];
+        let n_read =
+            read_block_from_complete_file(&mut file, 10, 99, &mut read_buf[..])
+                .unwrap();
+        dbg!(n_read, String::from_utf8(read_buf.to_vec()).unwrap());
     }
 }

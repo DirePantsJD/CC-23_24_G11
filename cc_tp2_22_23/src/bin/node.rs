@@ -93,7 +93,7 @@ fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
                         let peers_with_file = PeersWithFile::from_bytes(data)?;
                         println!("p_w_f:{:?}",peers_with_file);
                         //TODO: download files
-                        download_file(f_name, peers_with_file.peers_with_blocks);
+                        download_file(peers_with_file.file_size,f_name,peers_with_file.peers_with_blocks);
 
                     }
                 }
