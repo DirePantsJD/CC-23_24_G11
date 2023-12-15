@@ -228,8 +228,12 @@ pub fn download_file(
     // local_ip: String,
 ) {
     let data_unsafe: Shared = Shared::new(filename.clone(), p_to_c);
-    let nthreads: usize =
-        std::cmp::max(MAX_LEECH_THREADS as usize, data_unsafe.peer_count);
+    let nthreads: usize = 
+        if data_unsafe.peer_count<MAX_LEECH_THREADS as usize{
+            data_unsafe.peer_count
+        } else{
+            MAX_LEECH_THREADS as usize
+        };
     let max_chunks_id: u32 = data_unsafe.peers_to_chunk.len() as u32;
 
     let mut handles: Vec<thread::JoinHandle<()>> = Vec::new();
