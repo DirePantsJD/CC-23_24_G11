@@ -156,9 +156,10 @@ pub fn read_block_from_part_file(
 
     if buffer[0] == b'1' {
         // write block
-        file.seek(SeekFrom::Start((block_index * block_size).into()))?;
-        // ! FALTA TER EM CONTA A POSSIBILIDADE DE SER O ULTIMO BLOCO
-        let n = file.read(block)?;
+        file.seek(SeekFrom::Start(
+            (block_index * MAX_CHUNK_SIZE as u32).into(),
+        ))?;
+        let n = file.read(&mut block[..block_size as usize])?;
         Ok(n)
     } else {
         bail!("Block is not available");
