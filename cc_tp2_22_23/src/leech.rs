@@ -1,13 +1,14 @@
 use anyhow;
 use std::collections::{HashMap, HashSet};
+use std::fs::File;
 use std::io::ErrorKind;
 use std::net::{IpAddr, SocketAddr, UdpSocket};
 use std::sync::{Arc, RwLock};
 use std::thread;
 
-use crate::fsnp;
-use crate::partial_file::write_block;
-use crate::shared::{self, Shared};
+use crate::fsnp::*;
+use crate::partial_file::*;
+use crate::shared::*;
 
 const MAX_LEECH_THREADS: u8 = 5;
 
@@ -19,7 +20,7 @@ fn peer_picker(
     let mut peers: HashSet<IpAddr> = HashSet::new();
 
     if let Ok(data) = data_rwl.read() {
-        peers = data.peers_to_chunk[&chunk_id].iter().cloned().collect();
+        peers.extend(data.peers_to_chunk[&chunk_id].iter());
     } else {
         return None;
     }
@@ -67,22 +68,22 @@ fn peer_picker(
 fn request_chunk(
     peer_ip: IpAddr,
     local_socket: &UdpSocket,
-    chunkID: u32,
+    chunk_id: u32,
     filename: String,
 ) -> anyhow::Result<()> {
-    let p: Option<([u8; fsnp::MAX_PACKET_SIZE], u16)> = fsnp::Protocol {
+    let p: Option<([u8; MAX_PACKET_SIZE], u16)> = Protocol {
         action: 1,
-        chunk_id: chunkID,
+        chunk_id,
         filename: &filename,
         len_chunk: 0,
-        chunk_data: [0; fsnp::MAX_CHUNK_SIZE],
+        chunk_data: [0; MAX_CHUNK_SIZE],
     }
     .build_packet();
 
     match p {
         Some((packet, len)) => {
             match local_socket
-                .send_to(&packet[0..len as usize], (peer_ip, shared::PORT))
+                .send_to(&packet[0..len as usize], (peer_ip, PORT))
             {
                 Ok(_) => anyhow::Ok(()),
                 Err(e) => anyhow::bail!(e.to_string()),
@@ -98,6 +99,7 @@ fn stop_wait(
     thread_socket: &UdpSocket,
     data_rwl: &Arc<RwLock<Shared>>,
     filename: &String,
+    file: &mut File,
 ) -> anyhow::Result<(u32, bool)> {
     let mut next_chunk_id: u32 = 0;
     let mut max_chunk_id: u32 = 0;
@@ -146,14 +148,14 @@ fn stop_wait(
             match thread_socket.recv_from(&mut reply) {
                 Ok((len, source)) => {
                     if let Ok(packet) =
-                        fsnp::Protocol::read_packet(&reply, len as u16)
+                        Protocol::read_packet(&reply, len as u16)
                     {
                         if let Ok(()) =
                             send_ack(&thread_socket, packet.clone(), source)
                         {
                             if packet.chunk_id == next_chunk_id {
                                 if let Ok(_) = write_block(
-                                    packet.filename,
+                                    file,
                                     max_chunk_id - 1,
                                     packet.len_chunk as u32,
                                     packet.chunk_id,
@@ -202,16 +204,14 @@ fn stop_wait(
     }
 }
 
-// PLACEHOLDER
-
 fn send_ack(
     local_socket: &UdpSocket,
-    mut peer_response: fsnp::Protocol,
+    mut peer_response: Protocol,
     peer: SocketAddr,
 ) -> anyhow::Result<()> {
     peer_response.action = 0;
     peer_response.len_chunk = 0;
-    peer_response.chunk_data = [0; fsnp::MAX_CHUNK_SIZE];
+    peer_response.chunk_data = [0; MAX_CHUNK_SIZE];
 
     if let Some((ack, len)) = peer_response.build_packet() {
         if let Ok(_) = local_socket.send_to(&ack[0..len as usize], peer) {
@@ -222,6 +222,7 @@ fn send_ack(
 }
 
 pub fn download_file(
+    file_size: u32,
     filename: String,
     p_to_c: HashMap<u32, HashSet<IpAddr>>,
     // local_ip: String,
@@ -241,6 +242,7 @@ pub fn download_file(
 
     for _ in 0..nthreads {
         let t_handler = spawn(
+            file_size,
             filename.clone(),
             Arc::clone(&data),
             Arc::clone(&chunks_received),
@@ -252,11 +254,12 @@ pub fn download_file(
     }
 
     for t in handles {
-        t.join();
+        t.join().unwrap();
     }
 }
 
 fn spawn(
+    file_size: u32,
     filename: String,
     // ip: String,
     data: Arc<RwLock<Shared>>,
@@ -267,8 +270,15 @@ fn spawn(
     let t_handler = thread::spawn(move || {
         // if let Ok(socket) = UdpSocket::bind(ip + ":0") {
         if let Ok(socket) = UdpSocket::bind("0.0.0.0:0") {
+            let n_blocks = if file_size % MAX_CHUNK_SIZE as u32 == 0 {
+                file_size / MAX_CHUNK_SIZE as u32
+            } else {
+                file_size / MAX_CHUNK_SIZE as u32 + 1
+            };
+            let mut file =
+                create_part_file(&filename, file_size, n_blocks).unwrap();
             loop {
-                match stop_wait(&socket, &data, &filename) {
+                match stop_wait(&socket, &data, &filename, &mut file) {
                     Ok((id, success)) => {
                         if id == max_id {
                             break;
@@ -284,7 +294,7 @@ fn spawn(
                             }
                         }
                     }
-                    Err(e) => {}
+                    Err(_) => {}
                 }
             }
         }

@@ -183,6 +183,7 @@ fn file(
     msg: FstpMessage,
     buffer: &mut [u8],
 ) -> anyhow::Result<()> {
+    let mut file_size = 0;
     if let Some(data) = msg.data {
         let file_name = from_utf8(data).unwrap().trim_end();
         println!("Requested file: {}", file_name);
@@ -192,6 +193,7 @@ fn file(
         let mut peers_with_blocks = HashMap::new();
         if let Ok(file_to_ips) = file_to_ips_lock.read() {
             ips = file_to_ips.get(file_name).unwrap().clone();
+            file_size = ips[0].1.f_size as u32;
             //^ seria melhor responder com "404" caso None ^
         }
         let n_blocks = {
@@ -216,6 +218,7 @@ fn file(
         }
 
         let peers_with_file = PeersWithFile {
+            file_size,
             n_blocks,
             peers_with_file,
             peers_with_blocks,
