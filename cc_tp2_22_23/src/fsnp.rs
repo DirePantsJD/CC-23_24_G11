@@ -20,6 +20,8 @@ use anyhow::bail;
 
 pub const MAX_PACKET_SIZE: usize = 1453;
 pub const MAX_CHUNK_SIZE: usize = 1420;
+pub const SERVER_UDP_PORT: usize = 9090;
+
 
 pub struct Protocol<'a> {
     pub action: u8,
