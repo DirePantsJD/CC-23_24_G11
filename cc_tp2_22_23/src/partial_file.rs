@@ -1,7 +1,6 @@
 use anyhow::{bail, Ok, Result};
 use bitvec::order::Msb0;
 use bitvec::vec::BitVec;
-use std::char::MAX;
 use std::fs::File;
 use std::fs::{self, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
@@ -276,7 +275,7 @@ pub fn get_file_metadata(path: &PathBuf) -> Result<FileMeta> {
         ))?;
         let mut last_block_size = [0; size_of::<u32>()];
         file.read_exact(&mut last_block_size)?;
-        let last_block_size = u32::from_le_bytes(last_block_size);
+        // let last_block_size = u32::from_le_bytes(last_block_size);
 
         // get bit vector
         file.seek(SeekFrom::End(
