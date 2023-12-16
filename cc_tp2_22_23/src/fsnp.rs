@@ -48,7 +48,7 @@ impl<'a> Protocol<'a> {
         field3.copy_from_slice(&packet[6..8]);
         let len_c: u16 = u16::from_le_bytes(field3);
 
-        let byte_chunk_data: usize = 8 + len_filename as usize + 1;
+        let byte_chunk_data: usize = 8 + len_filename as usize;
 
         let mut data: [u8; MAX_CHUNK_SIZE] = [0; MAX_CHUNK_SIZE];
         let mut i: usize = 0;
@@ -79,8 +79,7 @@ impl<'a> Protocol<'a> {
         let action: [u8; 1] = self.action.to_le_bytes();
         let chunk_id: [u8; 4] = self.chunk_id.to_le_bytes();
         let len_filename: [u8; 1] = (self.filename.len() as u8).to_le_bytes();
-        let len_chunk_data: [u8; 2] =
-            (self.chunk_data.len() as u16).to_le_bytes();
+        let len_chunk_data: [u8; 2] = self.len_chunk.to_le_bytes();
         let filename: &[u8] = self.filename.as_bytes();
 
         let packet_len: u16 = 1
@@ -90,18 +89,17 @@ impl<'a> Protocol<'a> {
             + self.filename.len() as u16
             + self.chunk_data.len() as u16;
         let mut packet: [u8; MAX_PACKET_SIZE] = [0; MAX_PACKET_SIZE];
+        
+        packet[0] = action[0];
+        packet[1..=4].copy_from_slice(&chunk_id);
+        packet[5] = len_filename[0];
+        packet[6..=7].copy_from_slice(&len_chunk_data);
+        packet[8..=8-1+len_filename[0] as usize].copy_from_slice(&filename);
 
-        overwrite_array(0, 0, &action, &mut packet);
-        overwrite_array(1, 4, &chunk_id, &mut packet);
-        overwrite_array(5, 5, &len_filename, &mut packet);
-        overwrite_array(6, 7, &len_chunk_data, &mut packet);
-        overwrite_array(8, 8 + len_filename.len() - 1, &filename, &mut packet);
-        overwrite_array(
-            8 + len_filename.len(),
-            8 + len_filename.len() + self.chunk_data.len() - 1,
-            &self.chunk_data,
-            &mut packet,
-        );
+        if self.len_chunk>0{
+            packet[8+len_filename[0] as usize..=8-1+ len_filename[0] as usize + self.len_chunk as usize].
+                copy_from_slice(&self.chunk_data[0..self.len_chunk as usize]);
+        }
 
         Some((packet, packet_len))
     }
@@ -125,13 +123,27 @@ impl<'a> Protocol<'a> {
     }
 }
 
-pub fn overwrite_array(
-    index_ini: usize,
-    index_fini: usize,
-    src: &[u8],
-    dest: &mut [u8],
-) {
-    for i in index_ini..index_fini + 1 {
-        dest[i] = src[i];
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fsnp_test() {
+        let payload:Protocol = Protocol{
+            action:1,
+            chunk_id:69,
+            filename:"dingo",
+            len_chunk:0,
+            chunk_data:[0;MAX_CHUNK_SIZE]
+        };
+
+        let (serialized,len) = payload.build_packet().unwrap();
+        let parsed:Protocol = Protocol::read_packet(&serialized,len).unwrap();
+
+        assert_eq!(payload.action,parsed.action);
+        assert_eq!(payload.chunk_id,parsed.chunk_id);
+        assert_eq!(payload.filename,parsed.filename);
+        assert_eq!(payload.len_chunk,parsed.len_chunk);
+        assert_eq!(payload.chunk_data,parsed.chunk_data);
     }
 }
