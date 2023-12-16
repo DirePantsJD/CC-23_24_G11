@@ -10,7 +10,7 @@ pub struct Shared {
     pub rarity_ids: Vec<u32>,
     pub peers_to_chunk: HashMap<u32, HashSet<IpAddr>>,
     pub peers_taken: HashSet<IpAddr>,
-    pub peers_latency: HashMap<IpAddr, u16>,
+    pub peers_latency: HashMap<IpAddr, u16>, // milisec
     pub next_index: u32,
     pub peer_count: usize,
 }
