@@ -32,12 +32,12 @@ fn main() -> anyhow::Result<()> {
 
     thread::spawn(move || upload());
 
-    main_loop(stream.clone())?;
+    main_loop(&stream.clone())?;
 
     Ok(())
 }
 
-fn main_loop(stream:Arc<Mutex<TcpStream>>) -> anyhow::Result<()> {
+fn main_loop(stream:&Arc<Mutex<TcpStream>>) -> anyhow::Result<()> {
     let mut files: HashSet<String> = HashSet::new();
     loop {
         let mut buf = [0u8;1000];
@@ -102,7 +102,7 @@ fn main_loop(stream:Arc<Mutex<TcpStream>>) -> anyhow::Result<()> {
                     if let Some(data) = resp.data {
                         let peers_with_file = PeersWithFile::from_bytes(data)?;
                         println!("p_w_f:{:?}",peers_with_file);
-                        download_file(stream,peers_with_file.file_size,f_name,peers_with_file.peers_with_blocks);
+                        download_file(stream.clone(),peers_with_file.file_size,f_name,peers_with_file.peers_with_blocks);
 
                     }
                 }
