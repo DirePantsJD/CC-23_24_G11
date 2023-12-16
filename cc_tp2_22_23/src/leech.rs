@@ -5,6 +5,7 @@ use std::io::{ErrorKind, Write};
 use std::net::{IpAddr, SocketAddr, TcpStream, UdpSocket};
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
+use std::time::{Duration, Instant};
 
 use crate::fsnp::*;
 use crate::fstp::*;
@@ -12,12 +13,15 @@ use crate::partial_file::*;
 use crate::shared::*;
 
 const MAX_LEECH_THREADS: u8 = 5;
+const DEFAULT_TIMEOUT_MS: u32 = 500;
+const TIMEOUT_MULTIPLIER: f64 = 1.5;  
 
 fn peer_picker(
     chunk_id: u32,
     avoid_peers: &HashSet<IpAddr>,
     data_rwl: &Arc<RwLock<Shared>>,
-) -> Option<IpAddr> {
+) -> Option<(IpAddr,f64)> //(ip,milisec)
+{
     let mut peers: HashSet<IpAddr> = HashSet::new();
 
     if let Ok(data) = data_rwl.read() {
@@ -59,8 +63,13 @@ fn peer_picker(
         });
 
         data.peers_taken.insert(ordered_peers[0].clone());
-
-        Some(ordered_peers[0].clone())
+        
+        if data.peers_latency.contains_key(ordered_peers[0]){
+            Some((ordered_peers[0].clone(),data.peers_latency.get(ordered_peers[0]).unwrap().clone() as f64))
+        }
+        else{
+            Some((ordered_peers[0].clone(),0.0))
+        }
     } else {
         None
     }
@@ -126,11 +135,21 @@ fn stop_wait(
     let mut resend = true;
     let mut fetch_peer: bool = true;
     let mut peer_ip: IpAddr = thread_socket.local_addr()?.ip();
+    let mut latency_ms: f64 = 0.0;
+    let mut current_rtt = Instant::now();
 
     loop {
         if fetch_peer {
-            if let Some(ip) = peer_picker(next_chunk_id, &picked, &data_rwl) {
+            if let Some((ip,lat)) = peer_picker(next_chunk_id, &picked, &data_rwl) {
                 peer_ip = ip;
+                latency_ms = lat;
+                let timeout:Duration =
+                    if lat>0.0{
+                        Duration::new(0,(lat*TIMEOUT_MULTIPLIER) as u32*10_u32.pow(6))
+                    } else{
+                        Duration::new(0,DEFAULT_TIMEOUT_MS*10_u32.pow(6))
+                    };
+                thread_socket.set_read_timeout(Some(timeout));
             } else {
                 return Ok((next_chunk_id, false));
             }
@@ -144,6 +163,7 @@ fn stop_wait(
                 next_chunk_id,
                 filename.clone(),
             );
+            current_rtt = Instant::now();
         }
 
         if let Ok(()) = request {
@@ -152,17 +172,22 @@ fn stop_wait(
                     if let Ok(packet) =
                         Protocol::read_packet(&reply, len as u16)
                     {
-                        if let Ok(()) =
-                            send_ack(&thread_socket, packet.clone(), source)
-                        {
-                            if packet.chunk_id == next_chunk_id {
-                                if let Ok(_) = write_block(
-                                    file,
-                                    max_chunk_id - 1,
-                                    packet.len_chunk as u32,
-                                    packet.chunk_id,
-                                    &packet.chunk_data,
-                                ) {
+                        if packet.chunk_id == next_chunk_id {
+                            let duration = current_rtt.elapsed().as_millis();
+                            
+                            if let Ok(_) = write_block(
+                                file,
+                                max_chunk_id - 1,
+                                packet.len_chunk as u32,
+                                packet.chunk_id,
+                                &packet.chunk_data,
+                            ) {
+                                // update peer latency if necessary
+                                if duration as f64 >= latency_ms*TIMEOUT_MULTIPLIER
+                                    || duration as f64 <= latency_ms*(2_f64-TIMEOUT_MULTIPLIER)
+                                {
+                                    update_peer_latency(duration as u16,&peer_ip,data_rwl);
+
                                     let mut buff = [0; 33];
                                     let b_chunk_id =
                                         packet.chunk_id.to_le_bytes();
@@ -192,9 +217,13 @@ fn stop_wait(
                                     resend = true;
                                     eprintln!("Failed to receive block ");
                                 }
+                                return Ok((next_chunk_id, true));
                             } else {
-                                resend = false;
+                                resend = true;
+                                eprintln!("Failed to receive block ");
                             }
+                        } else {
+                            resend = false;
                         }
                     }
                     // bad packet; failed parsing
@@ -335,4 +364,14 @@ fn spawn(
     });
 
     t_handler
+}
+
+fn update_peer_latency(
+    new_latency_ms:u16,
+    ip:&IpAddr,
+    data_rwl: &Arc<RwLock<Shared>>
+){
+    if let Ok(mut data) = data_rwl.write(){
+        data.peers_latency.insert(ip.clone(),new_latency_ms);
+    }    
 }
