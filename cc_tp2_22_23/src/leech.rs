@@ -1,12 +1,13 @@
 use anyhow;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
-use std::io::ErrorKind;
-use std::net::{IpAddr, SocketAddr, UdpSocket};
-use std::sync::{Arc, RwLock};
+use std::io::{ErrorKind, Write};
+use std::net::{IpAddr, SocketAddr, TcpStream, UdpSocket};
+use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 
 use crate::fsnp::*;
+use crate::fstp::*;
 use crate::partial_file::*;
 use crate::shared::*;
 
@@ -96,6 +97,7 @@ fn request_chunk(
 }
 
 fn stop_wait(
+    tracker: &Arc<Mutex<TcpStream>>,
     thread_socket: &UdpSocket,
     data_rwl: &Arc<RwLock<Shared>>,
     filename: &String,
@@ -161,7 +163,30 @@ fn stop_wait(
                                     packet.chunk_id,
                                     &packet.chunk_data,
                                 ) {
-                                    //TODO: dizer ao tracker que tem chunk
+                                    let mut buff = [0; 33];
+                                    let b_chunk_id =
+                                        packet.chunk_id.to_le_bytes();
+                                    let b_fn_size =
+                                        (filename.len() as u32).to_le_bytes();
+                                    let b_filename = filename.as_bytes();
+                                    buff[0..4].copy_from_slice(&b_chunk_id);
+                                    buff[4..8].copy_from_slice(&b_fn_size);
+                                    buff[8..filename.len()]
+                                        .copy_from_slice(b_filename);
+                                    let data_size = 8 + filename.len();
+                                    let msg = FstpMessage {
+                                        header: FstpHeader {
+                                            flag: Flag::AddBlock,
+                                            data_size: data_size as u16,
+                                        },
+                                        data: Some(&buff[..data_size]),
+                                    };
+                                    let mut msg_buff = [0u8; 200];
+                                    let msg_size =
+                                        msg.as_bytes(&mut msg_buff).unwrap();
+                                    if let Ok(mut stream) = tracker.lock() {
+                                        stream.write_all(&msg_buff[..msg_size]);
+                                    }
                                     return Ok((next_chunk_id, true));
                                 } else {
                                     resend = true;
@@ -223,18 +248,19 @@ fn send_ack(
 }
 
 pub fn download_file(
+    tracker: Arc<Mutex<TcpStream>>,
     file_size: u32,
     filename: String,
     p_to_c: HashMap<u32, HashSet<IpAddr>>,
     // local_ip: String,
 ) {
     let data_unsafe: Shared = Shared::new(filename.clone(), p_to_c);
-    let nthreads: usize = 
-        if data_unsafe.peer_count<MAX_LEECH_THREADS as usize{
-            data_unsafe.peer_count
-        } else{
-            MAX_LEECH_THREADS as usize
-        };
+    let nthreads: usize = if data_unsafe.peer_count < MAX_LEECH_THREADS as usize
+    {
+        data_unsafe.peer_count
+    } else {
+        MAX_LEECH_THREADS as usize
+    };
     let max_chunks_id: u32 = data_unsafe.peers_to_chunk.len() as u32;
 
     let mut handles: Vec<thread::JoinHandle<()>> = Vec::new();
@@ -247,6 +273,7 @@ pub fn download_file(
 
     for _ in 0..nthreads {
         let t_handler = spawn(
+            tracker.clone(),
             file_size,
             filename.clone(),
             Arc::clone(&data),
@@ -264,6 +291,7 @@ pub fn download_file(
 }
 
 fn spawn(
+    tracker: Arc<Mutex<TcpStream>>,
     file_size: u32,
     filename: String,
     // ip: String,
@@ -283,7 +311,8 @@ fn spawn(
             let mut file =
                 create_part_file(&filename, file_size, n_blocks).unwrap();
             loop {
-                match stop_wait(&socket, &data, &filename, &mut file) {
+                match stop_wait(&tracker, &socket, &data, &filename, &mut file)
+                {
                     Ok((id, success)) => {
                         if id == max_id {
                             break;

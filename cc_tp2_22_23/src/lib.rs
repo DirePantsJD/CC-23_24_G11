@@ -8,5 +8,5 @@ pub mod fstp;
 pub mod leech;
 pub mod partial_file;
 pub mod peers_with_blocks;
-pub mod shared;
 pub mod seed;
+pub mod shared;

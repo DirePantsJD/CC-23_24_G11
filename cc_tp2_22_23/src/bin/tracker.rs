@@ -85,6 +85,9 @@ fn handler(
             Flag::Add => {
                 add(&mut stream, &tracking_lock, &file_to_ips_lock, msg)
             }
+            Flag::AddBlock => {
+                add_block(&tracking_lock, &file_to_ips_lock, msg);
+            }
             Flag::List => list(&mut stream, &tracking_lock, &mut buffer)?,
             Flag::File => {
                 file(&mut stream, &file_to_ips_lock, msg, &mut buffer)?
@@ -146,6 +149,14 @@ fn add(
     }
     // println!("{:?}", tracking_lock);
     // println!("{:?}", file_to_ips_lock);
+}
+
+fn add_block(
+    tracking_lock: &Arc<RwLock<HashMap<IpAddr, Vec<FileMeta>>>>,
+    file_to_ips_lock: &Arc<RwLock<HashMap<String, Vec<(IpAddr, FileMeta)>>>>,
+    msg: FstpMessage,
+) {
+    todo!()
 }
 
 fn list(
