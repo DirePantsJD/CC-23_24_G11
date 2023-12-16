@@ -50,27 +50,6 @@ impl<'a> FstpMessage<'a> {
             data,
         }) // return implicito
     }
-
-    pub fn build_add_block_msg(
-        filename: &String,
-        chunk_id: u32,
-    ) -> FstpMessage<'a> {
-        let mut buff = vec![0; 33];
-        let b_chunk_id = chunk_id.to_le_bytes();
-        let b_fn_size = (filename.len() as u32).to_le_bytes();
-        let b_filename = filename.as_bytes();
-        buff[0..4].copy_from_slice(&b_chunk_id);
-        buff[4..8].copy_from_slice(&b_fn_size);
-        buff[8..filename.len()].copy_from_slice(b_filename);
-        let data_size = 8 + filename.len();
-        FstpMessage {
-            header: FstpHeader {
-                flag: Flag::AddBlock,
-                data_size: data_size as u16,
-            },
-            data: Some(&buff[..data_size]),
-        }
-    }
 }
 
 impl Flag {
