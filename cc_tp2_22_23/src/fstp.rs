@@ -15,6 +15,7 @@ pub struct FstpHeader {
 pub enum Flag {
     Ok,
     Add,
+    AddBlock,
     List,
     File,
 }
@@ -58,6 +59,7 @@ impl Flag {
             Self::Add => 2u8,
             Self::List => 3u8,
             Self::File => 4u8,
+            Self::AddBlock => 5u8,
         }
     }
 
@@ -67,6 +69,7 @@ impl Flag {
             2 => Ok(Self::Add),
             3 => Ok(Self::List),
             4 => Ok(Self::File),
+            5 => Ok(Self::AddBlock),
             _ => bail!("Flag inválida"),
         }
     }

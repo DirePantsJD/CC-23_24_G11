@@ -2,35 +2,42 @@
 
 use anyhow::{Context, bail};
 use local::file_meta::*;
+use local::seed::upload;
 use local::fstp::*;
 use local::peers_with_blocks::*;
 use local::leech::download_file;
 use bitvec::prelude::*;
 use std::collections::HashSet;
 use std::env;
+use std::sync::{Mutex,Arc};
 use std::fs::{read_dir, File, ReadDir};
 use std::io::{Read, Write, stdin,stdout};
 use std::net::{TcpStream,Shutdown};
+use std::thread;
 use std::str::from_utf8;
 
 // const CHUNK_BYTES:u16 = 1420; 
 
 fn main() -> anyhow::Result<()> {
-    let mut stream = if let Some(tracker_addr) = env::args().nth(1){
+    let stream = if let Some(tracker_addr) = env::args().nth(1){
         TcpStream::connect(tracker_addr)    
         .context("Can't connect to server")?
     } else {
         bail!("No tracker address specified (ip:port)")
     };
 
-    contact_tracker(&mut stream)?;
+    let stream = Arc::new(Mutex::new(stream));
 
-    main_loop(&mut stream)?;
+    contact_tracker(stream.clone())?;
+
+    thread::spawn(move || upload());
+
+    main_loop(stream.clone())?;
 
     Ok(())
 }
 
-fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
+fn main_loop(stream:Arc<Mutex<TcpStream>>) -> anyhow::Result<()> {
     let mut files: HashSet<String> = HashSet::new();
     loop {
         let mut buf = [0u8;1000];
@@ -47,12 +54,14 @@ fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
                     data:None,
                 };
                 let msg_size = msg.as_bytes(&mut buf)?;
-                stream.write_all(&buf[..msg_size])?;
-                stream.flush()?;
-
-                if stream.read(&mut buf)? == 0 {
-                    bail!("Tracker no longer reachable");
-                } 
+                if let Ok(mut stream) = stream.lock() {
+                    stream.write_all(&buf[..msg_size])?;
+                    stream.flush()?;
+                
+                    if stream.read(&mut buf)? == 0 {
+                        bail!("Tracker no longer reachable");
+                    } 
+                }
                 
                 let response = FstpMessage::from_bytes(&buf)?;
                 println!("resp:{:?}",response);
@@ -79,28 +88,31 @@ fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
                         data: Some(f_name.as_bytes())
                     };
                     let msg_size = msg.as_bytes(&mut buf)?;
-                    stream.write_all(&mut buf[..msg_size])?;
-                    stream.flush()?;
+                    if let Ok(mut stream) = stream.lock() { 
+                        stream.write_all(&mut buf[..msg_size])?;
+                        stream.flush()?;
     
-                
-                    if stream.read(&mut buf)? == 0 {
-                        bail!("Server no longer reachable");
-                    } 
+                        if stream.read(&mut buf)? == 0 {
+                            bail!("Server no longer reachable");
+                        }
+                    }
                 
                     let resp = FstpMessage::from_bytes(&buf)?;
                     println!("resp:{:?}",resp);
                     if let Some(data) = resp.data {
                         let peers_with_file = PeersWithFile::from_bytes(data)?;
                         println!("p_w_f:{:?}",peers_with_file);
-                        //TODO: download files
-                        download_file(peers_with_file.file_size,f_name,peers_with_file.peers_with_blocks);
+                        download_file(stream,peers_with_file.file_size,f_name,peers_with_file.peers_with_blocks);
 
                     }
                 }
             }
             "exit" => {
-                stream.shutdown(Shutdown::Both)?;
+                if let Ok(stream) = stream.lock() {
+                    stream.shutdown(Shutdown::Both)?;
+                }
                 break;
+                
             }
             _=> println!("Invalid command: {}",command),
         }
@@ -108,7 +120,7 @@ fn main_loop(stream:&mut TcpStream) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn contact_tracker(stream:&mut TcpStream) ->anyhow::Result<()> {
+fn contact_tracker(stream:Arc<Mutex<TcpStream>>) ->anyhow::Result<()> {
     let files_meta = get_files_meta();
     let mut fm_buf = [0u8;100];
     let mut raw_data = [0u8;1000];
@@ -133,8 +145,10 @@ fn contact_tracker(stream:&mut TcpStream) ->anyhow::Result<()> {
     let mut msg_buffer = [0u8;2000];
     let msg_size = msg.as_bytes(&mut msg_buffer)?;
 
-    stream.write_all(&msg_buffer[..msg_size])?;
-    stream.flush()?;
+    if let Ok(mut stream) = stream.lock() {
+        stream.write_all(&msg_buffer[..msg_size])?;
+        stream.flush()?;
+    }
     Ok(())
 }
 

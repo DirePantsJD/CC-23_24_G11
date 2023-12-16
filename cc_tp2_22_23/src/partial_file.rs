@@ -314,7 +314,7 @@ pub fn get_file_metadata(path: &PathBuf) -> Result<FileMeta> {
     }
 }
 
-fn read_file(
+pub fn read_file(
     file_name: &str,
     block_index: u32,
     block_buf: &mut [u8],
