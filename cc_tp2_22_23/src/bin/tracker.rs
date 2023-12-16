@@ -86,7 +86,12 @@ fn handler(
                 add(&mut stream, &tracking_lock, &file_to_ips_lock, msg)
             }
             Flag::AddBlock => {
-                add_block(&tracking_lock, &file_to_ips_lock, msg);
+                add_block(
+                    stream.peer_addr().unwrap().ip(),
+                    &tracking_lock,
+                    &file_to_ips_lock,
+                    msg,
+                );
             }
             Flag::List => list(&mut stream, &tracking_lock, &mut buffer)?,
             Flag::File => {
@@ -152,11 +157,37 @@ fn add(
 }
 
 fn add_block(
+    ip: IpAddr,
     tracking_lock: &Arc<RwLock<HashMap<IpAddr, Vec<FileMeta>>>>,
     file_to_ips_lock: &Arc<RwLock<HashMap<String, Vec<(IpAddr, FileMeta)>>>>,
     msg: FstpMessage,
 ) {
-    todo!()
+    let data = msg.data.unwrap();
+    let chunk_id = u32::from_le_bytes(data[0..4].try_into().unwrap());
+    let fn_size = u32::from_le_bytes(data[4..8].try_into().unwrap());
+    let file_name = from_utf8(&data[8..8 + fn_size as usize]).unwrap();
+    if let Ok(mut tracking) = tracking_lock.write() {
+        if let Some(files_m) = tracking.get_mut(&ip) {
+            for fm in files_m.iter_mut() {
+                if fm.name == file_name && !fm.has_full_file {
+                    let mut block =
+                        fm.blocks.get_mut(chunk_id as usize).unwrap();
+                    block.set(true);
+                }
+            }
+        }
+    }
+    if let Ok(mut f_to_ips) = file_to_ips_lock.write() {
+        if let Some(vals) = f_to_ips.get_mut(file_name) {
+            for (peer_ip, fm) in vals.iter_mut() {
+                if *peer_ip == ip && !fm.has_full_file {
+                    let mut block =
+                        fm.blocks.get_mut(chunk_id as usize).unwrap();
+                    block.set(true);
+                }
+            }
+        }
+    }
 }
 
 fn list(
