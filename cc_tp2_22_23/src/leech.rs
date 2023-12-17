@@ -181,8 +181,9 @@ fn stop_wait(
                     {
                         if packet.chunk_id == next_chunk_id {
                             let duration = current_rtt.elapsed().as_millis();
-                            dbg!(&packet.len_chunk);
-                            dbg!(&packet);
+                            println!("chunk_id:{:?}\naction:{:?}\nf_n:{:?}\nlen_chunk:{:?}\nchunk_data:{:?}",
+                                packet.chunk_id,packet.action,packet.filename,
+                                packet.len_chunk,String::from_utf8(packet.chunk_data[0..packet.len_chunk as usize].to_vec()).unwrap());
                             if let Ok(_) = write_block(
                                 file,
                                 max_chunk_id - 1,
