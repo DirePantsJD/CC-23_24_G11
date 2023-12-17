@@ -281,6 +281,7 @@ pub fn get_file_metadata(path: &PathBuf) -> Result<FileMeta> {
         .and_then(|os_str| os_str.to_str())
         .expect("Failed to get file name");
 
+    dbg!(&name);
     if path.extension().unwrap() == "part" {
         let mut file = File::open(path).expect("Path doesnt exist");
 

@@ -1,7 +1,7 @@
 use bitvec::prelude::*;
 use std::hash::{Hash, Hasher};
 use std::io::{Read, Write};
-use std::str::{from_utf8, from_utf8_unchecked};
+use std::str::from_utf8;
 
 #[derive(Debug, Clone)]
 pub struct FileMeta {
@@ -43,12 +43,10 @@ impl FileMeta {
         let mut blocks = BitVec::<u8, Msb0>::new();
         blocks.write(&bytes[15..15 + blocks_len as usize])?;
         println!("bl:{},nl:{}", blocks_len, name_len);
-        let name = String::from(unsafe {
-            from_utf8_unchecked(
-                &bytes[15..15 + blocks_len as usize + name_len as usize],
-            )
-            // .unwrap()
-        });
+        let name = String::from(
+            from_utf8(&bytes[15..15 + blocks_len as usize + name_len as usize])
+                .unwrap(),
+        );
         let fm = FileMeta {
             f_size,
             has_full_file,
