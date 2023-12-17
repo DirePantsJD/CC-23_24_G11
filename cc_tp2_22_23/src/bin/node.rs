@@ -25,7 +25,6 @@ fn main() -> anyhow::Result<()> {
     } else {
         bail!("No tracker address specified (ip:port)")
     };
-
     let stream = Arc::new(Mutex::new(stream));
 
     contact_tracker(stream.clone())?;

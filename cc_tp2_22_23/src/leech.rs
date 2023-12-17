@@ -275,6 +275,7 @@ pub fn download_file(
     p_to_c: HashMap<u32, HashSet<IpAddr>>,
     // local_ip: String,
 ) {
+    dbg!(&p_to_c);
     let data_unsafe: Shared = Shared::new(filename.clone(), p_to_c);
     let nthreads: usize = if data_unsafe.peer_count < MAX_LEECH_THREADS as usize
     {
