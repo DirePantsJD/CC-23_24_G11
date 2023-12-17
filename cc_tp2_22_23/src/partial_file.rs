@@ -109,8 +109,10 @@ pub fn write_block(
     block: &[u8],
 ) -> Result<()> {
     // write chunk
-    file.seek(SeekFrom::Start((block_index * block_size).into()))?;
-    file.write_all(block)?;
+    file.seek(SeekFrom::Start(
+        (block_index * MAX_CHUNK_SIZE as u32).into(),
+    ))?;
+    file.write_all(&block[..block_size as usize])?;
 
     // mark chunk as written in file metadata
     file.seek(SeekFrom::End(
