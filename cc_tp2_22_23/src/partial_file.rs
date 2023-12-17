@@ -90,7 +90,7 @@ pub fn complete_part_file(
 
             // remove .part extension
             file_path.truncate(file_path.len() - 5);
-            fs::rename(partial_file_name, &file_path[FOLDER_PATH.len() + 1..])
+            fs::rename(file_path.clone(), &file_path[FOLDER_PATH.len() + 1..])
                 .context("Invalid file rename")?;
         } else {
             bail!("File is not complete");
