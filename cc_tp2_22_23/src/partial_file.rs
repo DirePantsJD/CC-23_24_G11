@@ -61,8 +61,11 @@ pub fn complete_part_file(
     let mut file_name = partial_file_name.to_owned();
     dbg!(&file_name);
     if file_name.ends_with(".part") {
-        let mut file =
-            File::open(partial_file_name).context("Failed to open file")?;
+        let mut file = OpenOptions::new()
+            .write(true)
+            .read(true)
+            .open(partial_file_name)
+            .context("Failed to open file")?;
         let mut meta_bytes = vec![0; n_blocks as usize];
 
         file.seek(SeekFrom::End(
@@ -77,6 +80,7 @@ pub fn complete_part_file(
         dbg!(&meta_bytes);
         if meta_bytes.iter().all(|b| *b == b'1') {
             // remove file metadata
+
             file.set_len(file_size.into())
                 .context("Failed to set len")?;
 
