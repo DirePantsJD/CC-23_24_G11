@@ -82,7 +82,7 @@ fn worker(
                 ) {
                     dbg!(&request.chunk_id);
                     let bytes_read = read_file(
-                        (String::from("./shared/") + request.filename).as_str(),
+                        request.filename,
                         request.chunk_id,
                         &mut chunk_data,
                     )
