@@ -181,11 +181,13 @@ pub fn read_block_from_part_file(
 /// Returns `Ok(())` if the operation was successful,  otherwise returns an `anyhow::Error`.
 pub fn read_block_from_complete_file(
     file: &mut File,
-    block_size: u32,
+    _block_size: u32,
     block_index: u32,
     block: &mut [u8],
 ) -> Result<usize> {
-    file.seek(SeekFrom::Start((block_index * block_size).into()))?;
+    file.seek(SeekFrom::Start(
+        (block_index * MAX_CHUNK_SIZE as u32).into(),
+    ))?;
     let n = file.read(block)?;
     Ok(n)
 }
@@ -329,6 +331,7 @@ pub fn read_file(
     } else {
         MAX_CHUNK_SIZE as u32
     };
+    dbg!(&file_size, &block_size, &n_blocks);
 
     if file_name.ends_with(".part") {
         read_block_from_part_file(
