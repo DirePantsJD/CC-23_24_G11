@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use anyhow::{bail, Context, Ok, Result};
 use bitvec::order::Msb0;
 use bitvec::vec::BitVec;
@@ -9,6 +10,9 @@ use std::path::PathBuf;
 
 use crate::file_meta::FileMeta;
 use crate::fsnp::MAX_CHUNK_SIZE;
+
+
+const FOLDER_PATH:&str = "./shared/";
 
 /// Creates a partial file with the given `file_name` and `file_size`.
 /// The file is created with the extension `.part`.
@@ -27,11 +31,12 @@ pub fn create_part_file(
     file_size: u32,
     n_blocks: u32,
 ) -> Result<File> {
+    let fname = String::from(FOLDER_PATH)+file_name;
     let file = OpenOptions::new()
         .create(true)
         .read(true)
         .write(true)
-        .open(file_name)?;
+        .open(&fname)?;
     file.set_len(
         (file_size
             + n_blocks
@@ -58,13 +63,13 @@ pub fn complete_part_file(
     file_size: u32,
     n_blocks: u32,
 ) -> anyhow::Result<()> {
-    let mut file_name = partial_file_name.to_owned();
-    dbg!(&file_name);
-    if file_name.ends_with(".part") {
+    let mut file_path = String::from(FOLDER_PATH)+partial_file_name;
+    dbg!(&file_path);
+    if file_path.ends_with(".part") {
         let mut file = OpenOptions::new()
             .write(true)
             .read(true)
-            .open(partial_file_name)
+            .open(&file_path)
             .context("Failed to open file")?;
         let mut meta_bytes = vec![0; n_blocks as usize];
 
@@ -85,8 +90,8 @@ pub fn complete_part_file(
                 .context("Failed to set len")?;
 
             // remove .part extension
-            file_name.truncate(file_name.len() - 5);
-            fs::rename(partial_file_name, &file_name[1..])
+            file_path.truncate(file_path.len() - 5);
+            fs::rename(partial_file_name, &file_path[1..])
                 .context("Invalid file rename")?;
         } else {
             bail!("File is not complete");
@@ -111,7 +116,7 @@ pub fn complete_part_file(
 ///
 /// Returns `Ok(())` if the write was successful, otherwise returns an `anyhow::Error`.
 pub fn write_block(
-    file: &mut File,
+    file: &mut Arc<File>,
     n_blocks: u32,
     block_size: u32,
     block_index: u32,
@@ -374,13 +379,15 @@ mod tests {
 
     #[test]
     fn create_write_read_test() {
-        let mut file = create_part_file("test_pfile", 1000, 100).unwrap(); //Works
+        let mut file = Arc::new(create_part_file("test_pfile", 1000, 100).unwrap()); //Works
         let block99 = b"Working???";
         let block00 = b"Is this...";
         let block49 = b"even rly..";
         write_block(&mut file, 100, 10, 99, block99).unwrap();
         write_block(&mut file, 100, 10, 0, block00).unwrap();
         write_block(&mut file, 100, 10, 49, block49).unwrap();
+
+        let mut file = File::open("test_pfile").unwrap();
         let read_buf = &mut [0; 10];
         let n_read =
             read_block_from_complete_file(&mut file, 10, 99, &mut read_buf[..])

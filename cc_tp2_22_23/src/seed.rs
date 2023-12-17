@@ -2,7 +2,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 
-use crate::fsnp;
+use crate::fsnp::{self, Protocol};
 use crate::partial_file::read_file;
 
 const MAX_NUMBER_THREADS: usize = 2;
@@ -80,7 +80,7 @@ fn worker(
                     &request_raw.0,
                     request_raw.1 as u16,
                 ) {
-                    dbg!(&request.chunk_id);
+                    println!("vvv FSNP IN vvv\n{:?}",request.to_string());
                     let bytes_read = read_file(
                         request.filename,
                         request.chunk_id,
@@ -97,12 +97,14 @@ fn worker(
                         if let Some((packet, len)) = request.build_packet() {
                             // lock to prevent UdpSocket::send race
                             if let Ok(_) = send.lock() {
+                                assert_eq!(request,Protocol::read_packet(&packet,len).unwrap());
                                 server_socket
                                     .send_to(
                                         &packet[..len as usize],
                                         request_raw.2,
                                     )
                                     .unwrap();
+                                println!("vvv FSNP OUT vvv\n{:?}",request.to_string());
                             }
                         }
                     }

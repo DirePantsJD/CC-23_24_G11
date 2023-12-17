@@ -121,6 +121,26 @@ impl<'a> Protocol<'a> {
             chunk_data: data,
         }
     }
+
+    pub fn to_string(&self) -> String{
+        return "Action:".to_string()+&self.action.to_string()+
+            " ID:"+
+            &self.chunk_id.to_string()+
+            " Filename:"+
+            self.filename+
+            " LenChunk:"+&self.len_chunk.to_string()+
+            "\n"+&String::from_utf8(self.chunk_data[0..self.len_chunk as usize].to_vec()).unwrap();
+    }
+}
+
+impl<'a> PartialEq for Protocol<'a>{
+    fn eq(&self,other:&Self) -> bool{
+        self.action == other.action &&
+        self.chunk_id == other.chunk_id &&
+        self.filename == other.filename &&
+        self.len_chunk == other.len_chunk &&
+        self.chunk_data[0..self.len_chunk as usize] == other.chunk_data[0..other.len_chunk as usize]
+    }
 }
 
 #[cfg(test)]
