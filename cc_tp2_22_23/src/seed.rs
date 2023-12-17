@@ -80,6 +80,7 @@ fn worker(
                     &request_raw.0,
                     request_raw.1 as u16,
                 ) {
+                    dbg!(&request.chunk_id);
                     let bytes_read = read_file(
                         (String::from("./shared/") + request.filename).as_str(),
                         request.chunk_id,
