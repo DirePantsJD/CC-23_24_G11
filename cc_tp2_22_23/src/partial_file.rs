@@ -319,6 +319,7 @@ pub fn read_file(
     block_index: u32,
     block_buf: &mut [u8],
 ) -> anyhow::Result<usize> {
+    dbg!(&file_name);
     let mut file = File::open(file_name).unwrap();
     let file_size = file.metadata().unwrap().len();
     let mut block_size = MAX_CHUNK_SIZE as u32;
