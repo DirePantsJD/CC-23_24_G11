@@ -5,6 +5,7 @@ pub const PORT: u16 = 9090;
 pub const TIMEOUT_SECS: u8 = 5;
 pub const TIMEOUT_NANO: u32 = 0;
 
+#[derive(Debug, Clone)]
 pub struct Shared {
     pub filename: String,
     pub rarity_ids: Vec<u32>,

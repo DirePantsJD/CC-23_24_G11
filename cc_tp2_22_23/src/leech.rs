@@ -275,7 +275,7 @@ pub fn download_file(
 
     let mut handles: Vec<thread::JoinHandle<()>> = Vec::new();
 
-    let data: Arc<RwLock<Shared>> = Arc::new(RwLock::new(data_unsafe));
+    let data: Arc<RwLock<Shared>> = Arc::new(RwLock::new(data_unsafe.clone()));
     let chunks_received: Arc<RwLock<HashSet<u32>>> =
         Arc::new(RwLock::new(HashSet::new()));
     let failed_chunks: Arc<RwLock<HashSet<u32>>> =
@@ -292,7 +292,7 @@ pub fn download_file(
     let mut file = Arc::new(
         create_part_file(filename.as_str(), file_size, nblocks as u32).unwrap(),
     );
-
+    dbg!(&nthreads, &data_unsafe.peer_count);
     for _ in 0..nthreads {
         let t_handler = spawn(
             tracker.clone(),
