@@ -71,7 +71,7 @@ fn worker(
             // try lock -> pop request from queue
             if let Ok(mut acquired) = packets.try_lock() {
                 if acquired.len() > 0 {
-                    request_raw = acquired.remove(1);
+                    request_raw = acquired.remove(0);
                     work = true;
                 }
             }
