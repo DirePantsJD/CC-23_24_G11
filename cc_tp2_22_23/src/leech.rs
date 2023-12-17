@@ -182,6 +182,7 @@ fn stop_wait(
                         if packet.chunk_id == next_chunk_id {
                             let duration = current_rtt.elapsed().as_millis();
                             dbg!(&packet.len_chunk);
+                            dbg!(&packet);
                             if let Ok(_) = write_block(
                                 file,
                                 max_chunk_id - 1,

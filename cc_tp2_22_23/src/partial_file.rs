@@ -56,16 +56,16 @@ pub fn create_part_file(
 pub fn complete_part_file(
     partial_file_name: &str,
     file_size: u32,
-    block_len: u32,
+    n_blocks: u32,
 ) -> Result<()> {
     let mut file_name = partial_file_name.to_owned();
 
     if file_name.ends_with(".part") {
         let mut file = File::open(partial_file_name)?;
-        let mut meta_bytes = vec![0; block_len as usize];
+        let mut meta_bytes = vec![0; n_blocks as usize];
 
         file.seek(SeekFrom::End(
-            -(block_len as i64
+            -(n_blocks as i64
                 + size_of::<u16>() as i64
                 + size_of::<u32>() as i64),
         ))?;
