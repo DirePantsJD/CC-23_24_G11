@@ -209,7 +209,7 @@ fn stop_wait(
                                 let b_filename = filename.as_bytes();
                                 buff[0..4].copy_from_slice(&b_chunk_id);
                                 buff[4..8].copy_from_slice(&b_fn_size);
-                                buff[8..filename.len()]
+                                buff[8..8 + filename.len()]
                                     .copy_from_slice(b_filename);
                                 let data_size = 8 + filename.len();
                                 let msg = FstpMessage {

@@ -51,8 +51,7 @@ impl<'a> Protocol<'a> {
 
         let mut data: [u8; MAX_CHUNK_SIZE] = [0; MAX_CHUNK_SIZE];
         let mut i: usize = 0;
-        for byte in
-            &packet[byte_chunk_data..(byte_chunk_data + len_c as usize + 1)]
+        for byte in &packet[byte_chunk_data..(byte_chunk_data + len_c as usize)]
         {
             data[i] = byte.clone();
             i += 1;
