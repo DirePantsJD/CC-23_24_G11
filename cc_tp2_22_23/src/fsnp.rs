@@ -22,7 +22,6 @@ pub const MAX_PACKET_SIZE: usize = 1453;
 pub const MAX_CHUNK_SIZE: usize = 1420;
 pub const SERVER_UDP_PORT: usize = 9090;
 
-
 pub struct Protocol<'a> {
     pub action: u8,
     pub chunk_id: u32,
@@ -89,16 +88,17 @@ impl<'a> Protocol<'a> {
             + self.filename.len() as u16
             + self.chunk_data.len() as u16;
         let mut packet: [u8; MAX_PACKET_SIZE] = [0; MAX_PACKET_SIZE];
-        
+
         packet[0] = action[0];
         packet[1..=4].copy_from_slice(&chunk_id);
         packet[5] = len_filename[0];
         packet[6..=7].copy_from_slice(&len_chunk_data);
-        packet[8..=8-1+len_filename[0] as usize].copy_from_slice(&filename);
+        packet[8..=8 - 1 + len_filename[0] as usize].copy_from_slice(&filename);
 
-        if self.len_chunk>0{
-            packet[8+len_filename[0] as usize..=8-1+ len_filename[0] as usize + self.len_chunk as usize].
-                copy_from_slice(&self.chunk_data[0..self.len_chunk as usize]);
+        if self.len_chunk > 0 {
+            packet[8 + len_filename[0] as usize
+                ..=8 - 1 + len_filename[0] as usize + self.len_chunk as usize]
+                .copy_from_slice(&self.chunk_data[0..self.len_chunk as usize]);
         }
 
         Some((packet, packet_len))
@@ -129,21 +129,21 @@ mod tests {
 
     #[test]
     fn fsnp_test() {
-        let payload:Protocol = Protocol{
-            action:1,
-            chunk_id:69,
-            filename:"dingo",
-            len_chunk:0,
-            chunk_data:[0;MAX_CHUNK_SIZE]
+        let payload: Protocol = Protocol {
+            action: 1,
+            chunk_id: 69,
+            filename: "dingo",
+            len_chunk: 0,
+            chunk_data: [0; MAX_CHUNK_SIZE],
         };
 
-        let (serialized,len) = payload.build_packet().unwrap();
-        let parsed:Protocol = Protocol::read_packet(&serialized,len).unwrap();
+        let (serialized, len) = payload.build_packet().unwrap();
+        let parsed: Protocol = Protocol::read_packet(&serialized, len).unwrap();
 
-        assert_eq!(payload.action,parsed.action);
-        assert_eq!(payload.chunk_id,parsed.chunk_id);
-        assert_eq!(payload.filename,parsed.filename);
-        assert_eq!(payload.len_chunk,parsed.len_chunk);
-        assert_eq!(payload.chunk_data,parsed.chunk_data);
+        assert_eq!(payload.action, parsed.action);
+        assert_eq!(payload.chunk_id, parsed.chunk_id);
+        assert_eq!(payload.filename, parsed.filename);
+        assert_eq!(payload.len_chunk, parsed.len_chunk);
+        assert_eq!(payload.chunk_data, parsed.chunk_data);
     }
 }

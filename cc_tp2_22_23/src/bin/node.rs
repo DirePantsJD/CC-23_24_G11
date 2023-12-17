@@ -78,6 +78,7 @@ fn main_loop(stream:&Arc<Mutex<TcpStream>>) -> anyhow::Result<()> {
                 stdout().write_all("Input file name\n".as_bytes())?;
                 stdout().flush()?;
                 stdin().read_line(&mut f_name)?;                
+                let f_name = f_name.trim();
 
                 if files.iter().any(|str| str == &f_name.trim_end()) {
                     let msg = FstpMessage {
@@ -119,7 +120,7 @@ fn main_loop(stream:&Arc<Mutex<TcpStream>>) -> anyhow::Result<()> {
                                 }
                             }
                         }
-                        download_file(stream.clone(),peers_with_file.file_size,f_name,p_to_cs);
+                        download_file(stream.clone(),peers_with_file.file_size,f_name.to_string(),p_to_cs);
 
                     }
                 }

@@ -81,8 +81,7 @@ fn worker(
                     request_raw.1 as u16,
                 ) {
                     let bytes_read = read_file(
-                        (String::from("./shared/") + request.filename.trim())
-                            .as_str(),
+                        (String::from("./shared/") + request.filename).as_str(),
                         request.chunk_id,
                         &mut chunk_data,
                     )
