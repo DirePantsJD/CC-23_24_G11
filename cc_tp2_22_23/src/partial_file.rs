@@ -69,14 +69,16 @@ pub fn complete_part_file(
             -(n_blocks as i64
                 + size_of::<u16>() as i64
                 + size_of::<u32>() as i64),
-        ))?;
-        file.read_exact(&mut meta_bytes)?;
+        ))
+        .context("Failed to Seek")?;
+        file.read_exact(&mut meta_bytes).context("Failed to read")?;
 
         // if all chunks were filled
         dbg!(&meta_bytes);
         if meta_bytes.iter().all(|b| *b == b'1') {
             // remove file metadata
-            file.set_len(file_size.into())?;
+            file.set_len(file_size.into())
+                .context("Failed to set len")?;
 
             // remove .part extension
             file_name.truncate(file_name.len() - 5);
