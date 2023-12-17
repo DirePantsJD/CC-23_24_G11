@@ -181,7 +181,7 @@ fn stop_wait(
                     {
                         if packet.chunk_id == next_chunk_id {
                             let duration = current_rtt.elapsed().as_millis();
-
+                            dbg!(&packet.len_chunk);
                             if let Ok(_) = write_block(
                                 file,
                                 max_chunk_id - 1,
@@ -276,6 +276,7 @@ pub fn download_file(
     // local_ip: String,
 ) {
     dbg!(&p_to_c);
+    let nblocks = p_to_c.len();
     let data_unsafe: Shared = Shared::new(filename.clone(), p_to_c);
     let nthreads: usize = if data_unsafe.peer_count < MAX_LEECH_THREADS as usize
     {
@@ -310,6 +311,7 @@ pub fn download_file(
     for t in handles {
         t.join().unwrap();
     }
+    complete_part_file(filename.as_str(), file_size, nblocks as u32).unwrap();
 }
 
 fn spawn(
