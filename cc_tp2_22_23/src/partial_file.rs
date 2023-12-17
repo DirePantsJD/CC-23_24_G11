@@ -120,7 +120,8 @@ pub fn write_block(
         block_index as i64
             - n_blocks as i64
             - size_of::<u16>() as i64
-            - size_of::<u32>() as i64,
+            - size_of::<u32>() as i64
+            - 1,
     ))?;
     file.write_all(&[b'1'])?;
     Ok(())
