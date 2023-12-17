@@ -1,4 +1,4 @@
-use anyhow::{bail, Ok, Result};
+use anyhow::{bail, Context, Ok, Result};
 use bitvec::order::Msb0;
 use bitvec::vec::BitVec;
 use std::fs::File;
@@ -57,11 +57,12 @@ pub fn complete_part_file(
     partial_file_name: &str,
     file_size: u32,
     n_blocks: u32,
-) -> Result<()> {
+) -> anyhow::Result<()> {
     let mut file_name = partial_file_name.to_owned();
 
     if file_name.ends_with(".part") {
-        let mut file = File::open(partial_file_name)?;
+        let mut file =
+            File::open(partial_file_name).context("Failed to open file")?;
         let mut meta_bytes = vec![0; n_blocks as usize];
 
         file.seek(SeekFrom::End(
@@ -79,7 +80,8 @@ pub fn complete_part_file(
 
             // remove .part extension
             file_name.truncate(file_name.len() - 5);
-            fs::rename(partial_file_name, file_name.clone())?;
+            fs::rename(partial_file_name, &file_name[1..])
+                .context("Invalid file rename")?;
         } else {
             bail!("File is not complete");
         }
