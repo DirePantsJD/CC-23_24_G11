@@ -72,6 +72,7 @@ pub fn complete_part_file(
         file.read_exact(&mut meta_bytes)?;
 
         // if all chunks were filled
+        dbg!(&meta_bytes);
         if meta_bytes.iter().all(|b| *b == b'1') {
             // remove file metadata
             file.set_len(file_size.into())?;
