@@ -59,7 +59,7 @@ pub fn complete_part_file(
     n_blocks: u32,
 ) -> anyhow::Result<()> {
     let mut file_name = partial_file_name.to_owned();
-    dbg & (file_name);
+    dbg!(&file_name);
     if file_name.ends_with(".part") {
         let mut file =
             File::open(partial_file_name).context("Failed to open file")?;
