@@ -62,7 +62,7 @@ pub fn complete_part_file(
     file_size: u32,
     n_blocks: u32,
 ) -> anyhow::Result<()> {
-    let mut file_path = String::from(FOLDER_PATH) + partial_file_name;
+    let file_path = String::from(FOLDER_PATH) + partial_file_name;
     dbg!(&file_path);
     if file_path.ends_with(".part") {
         let mut file = OpenOptions::new()
@@ -90,12 +90,9 @@ pub fn complete_part_file(
 
             // remove .part extension
             let mut partial_file_name = partial_file_name.to_string();
-            partial_file_name.truncate(file_path.len() - 5);
-            fs::rename(
-                file_path,
-                FOLDER_PATH.to_string() + &partial_file_name[1..],
-            )
-            .context("Invalid file rename")?;
+            partial_file_name.truncate(partial_file_name.len() - 5);
+            fs::rename(file_path, FOLDER_PATH.to_string() + &partial_file_name)
+                .context("Invalid file rename")?;
         } else {
             bail!("File is not complete");
         }
