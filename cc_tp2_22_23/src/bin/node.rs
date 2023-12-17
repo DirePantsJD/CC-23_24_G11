@@ -108,10 +108,14 @@ fn main_loop(stream:&Arc<Mutex<TcpStream>>) -> anyhow::Result<()> {
                         };
                         println!("p_w_f:{:?}",peers_with_file);
                         let mut p_to_cs = peers_with_file.peers_with_blocks.clone();
-                        for block_idx in 0..n_blocks {
-                            for p_w_f in peers_with_file.peers_with_file.iter() {
+                        for p_w_f in peers_with_file.peers_with_file.iter() {
+                            for block_idx in 0..n_blocks {
                                 if let Some(val) = p_to_cs.get_mut(&block_idx){
                                     val.insert(*p_w_f);
+                                } else {
+                                    let mut val = HashSet::new();
+                                    val.insert(*p_w_f);
+                                    p_to_cs.insert(block_idx, val); 
                                 }
                             }
                         }
