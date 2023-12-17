@@ -230,7 +230,6 @@ fn stop_wait(
                                 resend = true;
                                 eprintln!("Failed to receive block ");
                             }
-                            return Ok((next_chunk_id, true));
                         } else {
                             resend = false;
                         }
@@ -311,7 +310,12 @@ pub fn download_file(
     for t in handles {
         t.join().unwrap();
     }
-    complete_part_file(filename.as_str(), file_size, nblocks as u32).unwrap();
+    complete_part_file(
+        (".".to_owned() + filename.as_str() + ".part").as_str(),
+        file_size,
+        nblocks as u32,
+    )
+    .unwrap();
 }
 
 fn spawn(
