@@ -30,7 +30,7 @@ pub fn create_part_file(
     file_size: u32,
     n_blocks: u32,
 ) -> Result<File> {
-    let fname = String::from(FOLDER_PATH) + file_name;
+    let fname = String::from(FOLDER_PATH) + file_name + ".part";
     let file = OpenOptions::new()
         .create(true)
         .read(true)
