@@ -2,6 +2,7 @@
 
 use anyhow::{Context, bail};
 use local::file_meta::*;
+use local::fsnp::MAX_CHUNK_SIZE;
 use local::seed::upload;
 use local::fstp::*;
 use local::peers_with_blocks::*;
@@ -100,9 +101,14 @@ fn main_loop(stream:&Arc<Mutex<TcpStream>>) -> anyhow::Result<()> {
                     println!("resp:{:?}",resp);
                     if let Some(data) = resp.data {
                         let peers_with_file = PeersWithFile::from_bytes(data)?;
+                        let n_blocks = if peers_with_file.file_size % MAX_CHUNK_SIZE as u32 == 0 {
+                            peers_with_file.file_size / MAX_CHUNK_SIZE as u32
+                        } else {
+                            peers_with_file.file_size / MAX_CHUNK_SIZE as u32 + 1
+                        };
                         println!("p_w_f:{:?}",peers_with_file);
                         let mut p_to_cs = peers_with_file.peers_with_blocks.clone();
-                        for block_idx in 0..peers_with_file.n_blocks {
+                        for block_idx in 0..n_blocks {
                             for p_w_f in peers_with_file.peers_with_file.iter() {
                                 if let Some(val) = p_to_cs.get_mut(&block_idx){
                                     val.insert(*p_w_f);
