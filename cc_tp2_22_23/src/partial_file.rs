@@ -282,29 +282,33 @@ pub fn get_file_metadata(path: &PathBuf) -> Result<FileMeta> {
         .expect("Failed to get file name");
 
     if path.extension().unwrap() == "part" {
-        let mut file = File::open(path)?;
+        let mut file = File::open(path).expect("Path doesnt exist");
 
         // get bit vector size
-        file.seek(SeekFrom::End(-(size_of::<u32>() as i64)))?;
+        file.seek(SeekFrom::End(-(size_of::<u32>() as i64)))
+            .context("Failed to seek")?;
         let mut block_len = [0; size_of::<u32>()];
-        file.read_exact(&mut block_len)?;
+        file.read_exact(&mut block_len).expect("failed to read");
         let block_len = u32::from_le_bytes(block_len);
 
         // get size of last chunk
         file.seek(SeekFrom::End(
             -((size_of::<u16>() + size_of::<u32>()) as i64),
-        ))?;
+        ))
+        .expect("Failed to seek");
         let mut last_block_size = [0; size_of::<u32>()];
-        file.read_exact(&mut last_block_size)?;
+        file.read_exact(&mut last_block_size)
+            .expect("Failed to read");
         // let last_block_size = u32::from_le_bytes(last_block_size);
 
         // get bit vector
         file.seek(SeekFrom::End(
             -(block_len as i64
                 + ((size_of::<u16>() + size_of::<u32>()) as i64)),
-        ))?;
+        ))
+        .expect("Failed to seek");
         let mut bit_vec = vec![0; block_len as usize];
-        file.read_exact(&mut bit_vec)?;
+        file.read_exact(&mut bit_vec).expect("Failed to read");
         let mut blocks = BitVec::new();
         for byte in bit_vec.iter_mut() {
             if byte == &b'1' {
