@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use anyhow::{bail, Context, Ok, Result};
 use bitvec::order::Msb0;
 use bitvec::vec::BitVec;
@@ -7,12 +6,12 @@ use std::fs::{self, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::mem::size_of;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use crate::file_meta::FileMeta;
 use crate::fsnp::MAX_CHUNK_SIZE;
 
-
-const FOLDER_PATH:&str = "./shared/";
+const FOLDER_PATH: &str = "./shared/";
 
 /// Creates a partial file with the given `file_name` and `file_size`.
 /// The file is created with the extension `.part`.
@@ -31,7 +30,7 @@ pub fn create_part_file(
     file_size: u32,
     n_blocks: u32,
 ) -> Result<File> {
-    let fname = String::from(FOLDER_PATH)+file_name;
+    let fname = String::from(FOLDER_PATH) + file_name;
     let file = OpenOptions::new()
         .create(true)
         .read(true)
@@ -63,7 +62,7 @@ pub fn complete_part_file(
     file_size: u32,
     n_blocks: u32,
 ) -> anyhow::Result<()> {
-    let mut file_path = String::from(FOLDER_PATH)+partial_file_name;
+    let mut file_path = String::from(FOLDER_PATH) + partial_file_name;
     dbg!(&file_path);
     if file_path.ends_with(".part") {
         let mut file = OpenOptions::new()
@@ -340,7 +339,7 @@ pub fn read_file(
     block_buf: &mut [u8],
 ) -> anyhow::Result<usize> {
     dbg!(&file_name);
-    let mut file = File::open(file_name).unwrap();
+    let mut file = File::open(FOLDER_PATH.to_string() + file_name).unwrap();
     let file_size = file.metadata().unwrap().len();
     let n_blocks = (file_size as f64 / MAX_CHUNK_SIZE as f64).ceil() as u32;
     let block_size = if block_index == n_blocks - 1 {
@@ -379,7 +378,8 @@ mod tests {
 
     #[test]
     fn create_write_read_test() {
-        let mut file = Arc::new(create_part_file("test_pfile", 1000, 100).unwrap()); //Works
+        let mut file =
+            Arc::new(create_part_file("test_pfile", 1000, 100).unwrap()); //Works
         let block99 = b"Working???";
         let block00 = b"Is this...";
         let block49 = b"even rly..";

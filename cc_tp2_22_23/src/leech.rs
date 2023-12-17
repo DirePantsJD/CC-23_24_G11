@@ -99,9 +99,12 @@ fn request_chunk(
                 .send_to(&packet[0..len as usize], (peer_ip, PORT))
             {
                 Ok(_) => {
-                    println!("vvv FSNP OUT vvv\n{:?}",Protocol::read_packet(&packet,len)?.to_string());
+                    println!(
+                        "vvv FSNP OUT vvv\n{:?}",
+                        Protocol::read_packet(&packet, len)?.to_string()
+                    );
                     anyhow::Ok(())
-                },
+                }
                 Err(e) => anyhow::bail!(e.to_string()),
             }
         }
@@ -116,12 +119,11 @@ fn stop_wait(
     thread_socket: &UdpSocket,
     data_rwl: &Arc<RwLock<Shared>>,
     file: &mut Arc<File>,
-) -> anyhow::Result<(u32, bool)> 
-{
+) -> anyhow::Result<(u32, bool)> {
     let mut next_chunk_id: u32 = 0;
     let mut max_chunk_id: u32 = 0;
-    let mut filename:String = "".to_string();
-    
+    let mut filename: String = "".to_string();
+
     if let Ok(mut data) = data_rwl.write() {
         next_chunk_id = data.next_index;
         data.next_index += 1;
@@ -184,7 +186,7 @@ fn stop_wait(
                     if let Ok(packet) =
                         Protocol::read_packet(&reply, len as u16)
                     {
-                        println!("vvv FSNP IN vvv \n{:?}",packet.to_string());
+                        println!("vvv FSNP IN vvv \n{:?}", packet.to_string());
                         if packet.chunk_id == next_chunk_id {
                             let duration = current_rtt.elapsed().as_millis();
                             if let Ok(_) = write_block(
@@ -207,8 +209,10 @@ fn stop_wait(
                                         data_rwl,
                                     );
                                 }
-                                assert_eq!(&filename,&packet.filename);
-                                update_tracker_chunks(&packet,&filename,&tracker);
+                                assert_eq!(&filename, &packet.filename);
+                                update_tracker_chunks(
+                                    &packet, &filename, &tracker,
+                                )?;
                                 return Ok((next_chunk_id, true));
                             } else {
                                 resend = true;
@@ -279,18 +283,14 @@ pub fn download_file(
 
     // DEBUG
     let n_blocks = if file_size % MAX_CHUNK_SIZE as u32 == 0 {
-                file_size / MAX_CHUNK_SIZE as u32
-            } else {
-                file_size / MAX_CHUNK_SIZE as u32 + 1
-            };
-    assert_eq!(n_blocks,nblocks as u32);
-    
+        file_size / MAX_CHUNK_SIZE as u32
+    } else {
+        file_size / MAX_CHUNK_SIZE as u32 + 1
+    };
+    assert_eq!(n_blocks, nblocks as u32);
+
     let mut file = Arc::new(
-        create_part_file(
-            filename.as_str(),
-            file_size,
-            nblocks as u32
-        ).unwrap()
+        create_part_file(filename.as_str(), file_size, nblocks as u32).unwrap(),
     );
 
     for _ in 0..nthreads {
@@ -300,7 +300,7 @@ pub fn download_file(
             Arc::clone(&chunks_received),
             Arc::clone(&failed_chunks),
             max_chunks_id.clone(),
-            Arc::clone(&mut file)
+            Arc::clone(&mut file),
         );
 
         handles.push(t_handler);
@@ -324,13 +324,12 @@ fn spawn(
     chunks_received: Arc<RwLock<HashSet<u32>>>,
     chunks_failed: Arc<RwLock<HashSet<u32>>>,
     max_id: u32,
-    mut file:Arc<File>
+    mut file: Arc<File>,
 ) -> thread::JoinHandle<()> {
     let t_handler = thread::spawn(move || {
         if let Ok(socket) = UdpSocket::bind("0.0.0.0:0") {
             loop {
-                match stop_wait(&tracker, &socket, &data, &mut file)
-                {
+                match stop_wait(&tracker, &socket, &data, &mut file) {
                     Ok((id, success)) => {
                         if id == max_id {
                             break;
@@ -366,20 +365,17 @@ fn update_peer_latency(
 }
 
 fn update_tracker_chunks(
-    packet:&Protocol,
-    filename:&String,
-    tracker:&Arc<Mutex<TcpStream>>
-) -> anyhow::Result<()>
-{
+    packet: &Protocol,
+    filename: &String,
+    tracker: &Arc<Mutex<TcpStream>>,
+) -> anyhow::Result<()> {
     let mut buff = [0; 33];
     let b_chunk_id = packet.chunk_id.to_le_bytes();
-    let b_fn_size =
-        (filename.len() as u32).to_le_bytes();
+    let b_fn_size = (filename.len() as u32).to_le_bytes();
     let b_filename = filename.as_bytes();
     buff[0..4].copy_from_slice(&b_chunk_id);
     buff[4..8].copy_from_slice(&b_fn_size);
-    buff[8..8 + filename.len()]
-        .copy_from_slice(b_filename);
+    buff[8..8 + filename.len()].copy_from_slice(b_filename);
     let data_size = 8 + filename.len();
     let msg = FstpMessage {
         header: FstpHeader {
@@ -389,8 +385,7 @@ fn update_tracker_chunks(
         data: Some(&buff[..data_size]),
     };
     let mut msg_buff = [0u8; 200];
-    let msg_size =
-        msg.as_bytes(&mut msg_buff).unwrap();
+    let msg_size = msg.as_bytes(&mut msg_buff).unwrap();
     if let Ok(mut stream) = tracker.lock() {
         stream.write_all(&msg_buff[..msg_size])?;
     }
