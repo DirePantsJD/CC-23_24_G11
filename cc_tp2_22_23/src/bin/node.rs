@@ -109,7 +109,7 @@ fn main_loop(stream:&Arc<Mutex<TcpStream>>) -> anyhow::Result<()> {
                                 }
                             }
                         }
-                        download_file(stream.clone(),peers_with_file.file_size,f_name,peers_with_file.peers_with_blocks);
+                        download_file(stream.clone(),peers_with_file.file_size,f_name,p_to_cs);
 
                     }
                 }
