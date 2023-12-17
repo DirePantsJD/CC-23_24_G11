@@ -88,11 +88,14 @@ pub fn complete_part_file(
             file.set_len(file_size.into())
                 .context("Failed to set len")?;
 
-            let prev_file_path = file_path.clone();
             // remove .part extension
-            file_path.truncate(file_path.len() - 5);
-            fs::rename(prev_file_path, &file_path[FOLDER_PATH.len() + 1..])
-                .context("Invalid file rename")?;
+            let mut partial_file_name = partial_file_name.to_string();
+            partial_file_name.truncate(file_path.len() - 5);
+            fs::rename(
+                file_path,
+                FOLDER_PATH.to_string() + &partial_file_name[1..],
+            )
+            .context("Invalid file rename")?;
         } else {
             bail!("File is not complete");
         }
