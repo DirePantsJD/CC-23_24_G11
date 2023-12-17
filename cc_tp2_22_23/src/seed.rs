@@ -86,6 +86,10 @@ fn worker(
                         &mut chunk_data,
                     )
                     .unwrap();
+                    dbg!(String::from_utf8(
+                        chunk_data[..bytes_read].to_owned()
+                    )
+                    .unwrap());
                     if bytes_read > 0 {
                         request.len_chunk = bytes_read as u16;
                         request.chunk_data = chunk_data.clone();
