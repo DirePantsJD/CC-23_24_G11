@@ -101,6 +101,14 @@ fn main_loop(stream:&Arc<Mutex<TcpStream>>) -> anyhow::Result<()> {
                     if let Some(data) = resp.data {
                         let peers_with_file = PeersWithFile::from_bytes(data)?;
                         println!("p_w_f:{:?}",peers_with_file);
+                        let mut p_to_cs = peers_with_file.peers_with_blocks.clone();
+                        for k in peers_with_file.peers_with_blocks.keys() {
+                            for p_w_f in peers_with_file.peers_with_file.iter() {
+                                if let Some(val) = p_to_cs.get_mut(k){
+                                    val.insert(*p_w_f);
+                                }
+                            }
+                        }
                         download_file(stream.clone(),peers_with_file.file_size,f_name,peers_with_file.peers_with_blocks);
 
                     }
