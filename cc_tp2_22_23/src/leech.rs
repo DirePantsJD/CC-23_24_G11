@@ -276,7 +276,6 @@ pub fn download_file(
     p_to_c: HashMap<u32, HashSet<IpAddr>>,
     // local_ip: String,
 ) {
-    let filename = "./shared/.".to_string() + filename.as_str();
     dbg!(&p_to_c);
     let nblocks = p_to_c.len();
     let data_unsafe: Shared = Shared::new(filename.clone(), p_to_c);
