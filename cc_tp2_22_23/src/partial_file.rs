@@ -284,13 +284,8 @@ pub fn get_file_metadata(path: &PathBuf) -> Result<FileMeta> {
     if path.extension().unwrap() == "part" {
         let mut file = File::open(path).expect("Path doesnt exist");
 
-        // get bit vector size
-        file.seek(SeekFrom::End(-(size_of::<u32>() as i64)))
-            .context("Failed to seek")?;
-        let mut n_blocks = [0; size_of::<u32>()];
-        file.read_exact(&mut n_blocks).expect("failed to read");
-        let n_blocks = u32::from_le_bytes(n_blocks);
-
+        let file_size = meta.len();
+        let n_blocks = (file_size as f64 / MAX_CHUNK_SIZE as f64).ceil() as u32;
         // get size of last chunk
         file.seek(SeekFrom::End(
             -((size_of::<u16>() + size_of::<u32>()) as i64),
