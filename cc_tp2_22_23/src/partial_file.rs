@@ -303,6 +303,7 @@ pub fn get_file_metadata(path: &PathBuf) -> Result<FileMeta> {
 
         // get byte vector
         dbg!(
+            &n_blocks,
             -(n_blocks as i64 + ((size_of::<u16>() + size_of::<u32>()) as i64))
         );
         file.seek(SeekFrom::End(
