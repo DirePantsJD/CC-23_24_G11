@@ -138,32 +138,33 @@ pub fn write_block(
 /// Returns `Ok(())` if the operation was successful,  otherwise returns an `anyhow::Error`.
 pub fn read_block_from_part_file(
     file: &mut File,
-    n_blocks: u32,
+    _n_blocks: u32,
     block_size: u32,
     block_index: u32,
     block: &mut [u8],
 ) -> Result<usize> {
     // verify, in file metadata, if block was already written
-    file.seek(SeekFrom::End(
-        (block_index
-            - n_blocks
-            - size_of::<u16>() as u32
-            - size_of::<u32>() as u32)
-            .into(),
-    ))?;
-    let mut buffer = [0; 1];
-    file.read_exact(&mut buffer)?;
+    // file.seek(SeekFrom::End(
+    //     (block_index
+    //         - n_blocks
+    //         - size_of::<u16>() as u32
+    //         - size_of::<u32>() as u32)
+    //         .into(),
+    // ))?;
+    // let mut buffer = [0; 1];
+    // file.read_exact(&mut buffer)?;
 
-    if buffer[0] == b'1' {
-        // write block
-        file.seek(SeekFrom::Start(
-            (block_index * MAX_CHUNK_SIZE as u32).into(),
-        ))?;
-        let n = file.read(&mut block[..block_size as usize])?;
-        Ok(n)
-    } else {
-        bail!("Block is not available");
-    }
+    // if buffer[0] == b'1' {
+    // write block
+    // Se for ultimo
+    file.seek(SeekFrom::Start(
+        (block_index * MAX_CHUNK_SIZE as u32).into(),
+    ))?;
+    let n = file.read(&mut block[..block_size as usize])?;
+    Ok(n)
+    // } else {
+    // bail!("Block is not available");
+    // }
 }
 
 /// Reads a block from a complete file at a given index.
@@ -322,13 +323,13 @@ pub fn read_file(
     dbg!(&file_name);
     let mut file = File::open(file_name).unwrap();
     let file_size = file.metadata().unwrap().len();
-    let mut block_size = MAX_CHUNK_SIZE as u32;
-    let n_blocks = if file_size % MAX_CHUNK_SIZE as u64 == 0 {
-        (file_size / MAX_CHUNK_SIZE as u64) as u32
+    let n_blocks = (file_size as f64 / MAX_CHUNK_SIZE as f64).ceil() as u32;
+    let block_size = if block_index == n_blocks - 1 {
+        file_size as u32 % n_blocks as u32
     } else {
-        block_size = (file_size % MAX_CHUNK_SIZE as u64) as u32;
-        (file_size / MAX_CHUNK_SIZE as u64 + 1) as u32
+        MAX_CHUNK_SIZE as u32
     };
+
     if file_name.ends_with(".part") {
         read_block_from_part_file(
             &mut file,
