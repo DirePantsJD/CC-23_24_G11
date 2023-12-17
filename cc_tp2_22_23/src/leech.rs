@@ -276,6 +276,7 @@ pub fn download_file(
     p_to_c: HashMap<u32, HashSet<IpAddr>>,
     // local_ip: String,
 ) {
+    let filename = "./shared/.".to_string() + filename.as_str();
     dbg!(&p_to_c);
     let nblocks = p_to_c.len();
     let data_unsafe: Shared = Shared::new(filename.clone(), p_to_c);
@@ -313,7 +314,7 @@ pub fn download_file(
         t.join().unwrap();
     }
     complete_part_file(
-        (".".to_owned() + filename.as_str() + ".part").as_str(),
+        (filename + ".part").as_str(),
         file_size,
         nblocks as u32,
     )
@@ -339,7 +340,8 @@ fn spawn(
                 file_size / MAX_CHUNK_SIZE as u32 + 1
             };
             let mut file =
-                create_part_file(&filename, file_size, n_blocks).unwrap();
+                create_part_file(filename.as_str(), file_size, n_blocks)
+                    .unwrap();
             loop {
                 match stop_wait(&tracker, &socket, &data, &filename, &mut file)
                 {

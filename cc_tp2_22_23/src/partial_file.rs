@@ -31,7 +31,7 @@ pub fn create_part_file(
         .create(true)
         .read(true)
         .write(true)
-        .open(format!(".{}.part", file_name))?;
+        .open(file_name)?;
     file.set_len(
         (file_size
             + n_blocks
