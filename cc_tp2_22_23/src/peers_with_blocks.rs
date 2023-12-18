@@ -34,7 +34,7 @@ impl PeersWithFile {
             &mut p_w_b_buf,
             self.n_blocks,
         );
-        dbg!(&p_w_b_buf);
+        dbg!(&p_w_b_buf[..p_w_b_buf_size]);
 
         if p_w_f_len != 0 {
             buf[0..4].copy_from_slice(&f_size_bytes);
@@ -71,7 +71,7 @@ impl PeersWithFile {
         buf: &mut [u8],
         n_blocks: u32,
     ) -> usize {
-        dbg!(&p_w_b);
+        dbg!(&p_w_b, &n_blocks);
         let mut offset = 0;
         for b_id in 0..n_blocks {
             if let Some(ips_set) = p_w_b.get(&b_id) {
