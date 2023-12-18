@@ -30,7 +30,8 @@ impl FileMeta {
         buf[8..9].copy_from_slice(&b_has_ff);
         buf[9..13].copy_from_slice(&b_blocks_len);
         buf[13..15].copy_from_slice(&b_name_len);
-        buf[15..15 + blocks_len].copy_from_slice(&b_blocks_buff[..blocks_len]);
+        buf[15..15 + blocks_len / 8]
+            .copy_from_slice(&b_blocks_buff[..blocks_len / 8]);
         buf[15 + blocks_len..15 + blocks_len + b_name.len()]
             .copy_from_slice(b_name);
         Ok(15 + blocks_len as usize + b_name.len())
