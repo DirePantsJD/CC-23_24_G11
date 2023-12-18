@@ -80,7 +80,7 @@ fn worker(
                     &request_raw.0,
                     request_raw.1 as u16,
                 ) {
-                    println!("vvv FSNP IN vvv\n{:?}",request.to_string());
+                    println!("\n\nvvv FSNP IN vvv\n{:?}", request.to_string());
                     let bytes_read = read_file(
                         request.filename,
                         request.chunk_id,
@@ -97,14 +97,21 @@ fn worker(
                         if let Some((packet, len)) = request.build_packet() {
                             // lock to prevent UdpSocket::send race
                             if let Ok(_) = send.lock() {
-                                assert_eq!(request,Protocol::read_packet(&packet,len).unwrap());
+                                assert_eq!(
+                                    request,
+                                    Protocol::read_packet(&packet, len)
+                                        .unwrap()
+                                );
                                 server_socket
                                     .send_to(
                                         &packet[..len as usize],
                                         request_raw.2,
                                     )
                                     .unwrap();
-                                println!("vvv FSNP OUT vvv\n{:?}",request.to_string());
+                                println!(
+                                    "\n\nvvv FSNP OUT vvv\n{:?}",
+                                    request.to_string()
+                                );
                             }
                         }
                     }

@@ -100,7 +100,7 @@ fn request_chunk(
             {
                 Ok(_) => {
                     println!(
-                        "vvv FSNP OUT vvv\n{:?}",
+                        "\n\nvvv FSNP OUT vvv\n{:?}",
                         Protocol::read_packet(&packet, len)?.to_string()
                     );
                     anyhow::Ok(())
@@ -179,6 +179,7 @@ fn stop_wait(
             );
             current_rtt = Instant::now();
         }
+        dbg!(&peer_ip, thread::current().id());
 
         if let Ok(()) = request {
             match thread_socket.recv_from(&mut reply) {
@@ -186,7 +187,10 @@ fn stop_wait(
                     if let Ok(packet) =
                         Protocol::read_packet(&reply, len as u16)
                     {
-                        println!("vvv FSNP IN vvv \n{:?}", packet.to_string());
+                        println!(
+                            "\n\nvvv FSNP IN vvv \n{:?}",
+                            packet.to_string()
+                        );
                         if packet.chunk_id == next_chunk_id {
                             println!("chunkkk:{}", packet.chunk_id);
                             let duration = current_rtt.elapsed().as_millis();
