@@ -34,6 +34,7 @@ impl PeersWithFile {
             &mut p_w_b_buf,
             self.n_blocks,
         );
+        dbg!(&p_w_b_buf);
 
         if p_w_f_len != 0 {
             buf[0..4].copy_from_slice(&f_size_bytes);
