@@ -1,6 +1,5 @@
-use bitvec::prelude::*;
 use std::hash::{Hash, Hasher};
-use std::io::{Read, Write};
+use std::io::Write;
 use std::str::from_utf8;
 
 #[derive(Debug, Clone)]
@@ -9,7 +8,7 @@ pub struct FileMeta {
     pub has_full_file: bool,
     pub blocks_len: u32,
     pub name_len: u16,
-    pub blocks: BitVec<u8, Msb0>,
+    pub blocks: Vec<u8>,
     pub name: String,
 }
 
@@ -21,17 +20,16 @@ impl FileMeta {
         let b_has_ff = if has_ffile { [1u8] } else { [0u8] };
         let b_blocks_len = self.blocks_len.to_be_bytes();
         let b_name_len = self.name_len.to_be_bytes();
-        let mut b_blocks_buff = [0u8; 1000];
-        let bytes_read = self.blocks.clone().read(&mut b_blocks_buff)?;
-        dbg!(&bytes_read, &blocks_len, &b_blocks_buff[..blocks_len]);
+        let b_blocks = self.blocks.as_slice();
+        // dbg!(&bytes_read, &blocks_len, &b_blocks_buff[..bytes_read]);
         let b_name = self.name.as_bytes();
 
         buf[..8].copy_from_slice(&b_f_size);
         buf[8..9].copy_from_slice(&b_has_ff);
         buf[9..13].copy_from_slice(&b_blocks_len);
         buf[13..15].copy_from_slice(&b_name_len);
-        buf[15..15 + bytes_read].copy_from_slice(&b_blocks_buff[..bytes_read]);
-        buf[15 + bytes_read..15 + bytes_read + b_name.len()]
+        buf[15..15 + blocks_len].copy_from_slice(&b_blocks);
+        buf[15 + blocks_len..15 + blocks_len + b_name.len()]
             .copy_from_slice(b_name);
         Ok(15 + blocks_len as usize + b_name.len())
     }
@@ -41,7 +39,7 @@ impl FileMeta {
         let has_full_file = if bytes[8] == 1 { true } else { false };
         let blocks_len = u32::from_be_bytes(bytes[9..13].try_into().unwrap());
         let name_len = u16::from_be_bytes(bytes[13..15].try_into().unwrap());
-        let mut blocks = BitVec::<u8, Msb0>::new();
+        let mut blocks = Vec::<u8>::new();
         blocks.write(&bytes[15..15 + blocks_len as usize])?;
         println!("bl:{},nl:{}", blocks_len, name_len);
         let name = String::from(

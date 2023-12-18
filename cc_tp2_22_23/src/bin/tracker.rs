@@ -7,7 +7,6 @@ use std::collections::{HashMap, HashSet};
 use std::env;
 use std::io::{Read, Write};
 use std::net::{IpAddr, TcpListener, TcpStream};
-use std::ops::Deref;
 use std::str::from_utf8;
 use std::sync::{Arc, RwLock};
 use threadpool::ThreadPool;
@@ -170,9 +169,7 @@ fn add_block(
         if let Some(files_m) = tracking.get_mut(&ip) {
             for fm in files_m.iter_mut() {
                 if fm.name == file_name && !fm.has_full_file {
-                    let mut block =
-                        fm.blocks.get_mut(chunk_id as usize).unwrap();
-                    block.set(true);
+                    fm.blocks[chunk_id as usize] = 1;
                 }
             }
         }
@@ -181,9 +178,7 @@ fn add_block(
         if let Some(vals) = f_to_ips.get_mut(file_name) {
             for (peer_ip, fm) in vals.iter_mut() {
                 if *peer_ip == ip && !fm.has_full_file {
-                    let mut block =
-                        fm.blocks.get_mut(chunk_id as usize).unwrap();
-                    block.set(true);
+                    fm.blocks[chunk_id as usize] = 1;
                 }
             }
         }
@@ -248,7 +243,7 @@ fn file(
             } else {
                 for (b_id, val) in meta.blocks.iter().enumerate() {
                     let b_id = b_id as u32;
-                    if *val.deref() {
+                    if *val == 1 {
                         if let None = peers_with_blocks.get(&b_id) {
                             let mut addrs = HashSet::new();
                             addrs.insert(ip);
