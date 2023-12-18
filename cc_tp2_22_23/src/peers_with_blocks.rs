@@ -70,6 +70,7 @@ impl PeersWithFile {
         buf: &mut [u8],
         n_blocks: u32,
     ) -> usize {
+        dbg!(&p_w_b);
         let mut offset = 0;
         for b_id in 0..n_blocks {
             if let Some(ips_set) = p_w_b.get(&b_id) {
