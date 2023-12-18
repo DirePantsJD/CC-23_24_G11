@@ -22,17 +22,16 @@ impl FileMeta {
         let b_blocks_len = self.blocks_len.to_be_bytes();
         let b_name_len = self.name_len.to_be_bytes();
         let mut b_blocks_buff = [0u8; 1000];
-        self.blocks.clone().read(&mut b_blocks_buff)?;
-        dbg!(&blocks_len, &b_blocks_buff[..blocks_len]);
+        let bytes_read = self.blocks.clone().read(&mut b_blocks_buff)?;
+        dbg!(&bytes_read, &blocks_len, &b_blocks_buff[..blocks_len]);
         let b_name = self.name.as_bytes();
 
         buf[..8].copy_from_slice(&b_f_size);
         buf[8..9].copy_from_slice(&b_has_ff);
         buf[9..13].copy_from_slice(&b_blocks_len);
         buf[13..15].copy_from_slice(&b_name_len);
-        buf[15..15 + blocks_len / 8]
-            .copy_from_slice(&b_blocks_buff[..blocks_len / 8]);
-        buf[15 + blocks_len..15 + blocks_len + b_name.len()]
+        buf[15..15 + bytes_read].copy_from_slice(&b_blocks_buff[..bytes_read]);
+        buf[15 + bytes_read..15 + bytes_read + b_name.len()]
             .copy_from_slice(b_name);
         Ok(15 + blocks_len as usize + b_name.len())
     }
