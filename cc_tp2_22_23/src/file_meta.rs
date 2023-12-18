@@ -21,9 +21,8 @@ impl FileMeta {
         let b_blocks_len = self.blocks_len.to_be_bytes();
         let b_name_len = self.name_len.to_be_bytes();
         let b_blocks = self.blocks.as_slice();
-        // dbg!(&bytes_read, &blocks_len, &b_blocks_buff[..bytes_read]);
         let b_name = self.name.as_bytes();
-
+        dbg!(&b_blocks, &self.name);
         buf[..8].copy_from_slice(&b_f_size);
         buf[8..9].copy_from_slice(&b_has_ff);
         buf[9..13].copy_from_slice(&b_blocks_len);
