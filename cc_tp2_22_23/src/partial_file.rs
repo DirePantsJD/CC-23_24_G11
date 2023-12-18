@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Ok, Result};
+use anyhow::{bail, Context};
 use std::fs::File;
 use std::fs::{self, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
@@ -27,7 +27,7 @@ pub fn create_part_file(
     file_name: &str,
     file_size: u32,
     n_blocks: u32,
-) -> Result<File> {
+) -> anyhow::Result<File> {
     let fname = String::from(FOLDER_PATH) + file_name + ".part";
     let file = OpenOptions::new()
         .create(true)
@@ -119,7 +119,7 @@ pub fn write_block(
     block_size: u32,
     block_index: u32,
     block: &[u8],
-) -> Result<()> {
+) -> anyhow::Result<()> {
     // write chunk
     file.seek(SeekFrom::Start(
         (block_index * MAX_CHUNK_SIZE as u32).into(),
@@ -157,7 +157,7 @@ pub fn read_block_from_part_file(
     block_size: u32,
     block_index: u32,
     block: &mut [u8],
-) -> Result<usize> {
+) -> anyhow::Result<usize> {
     // verify, in file metadata, if block was already written
     // file.seek(SeekFrom::End(
     //     (block_index
@@ -199,7 +199,7 @@ pub fn read_block_from_complete_file(
     _block_size: u32,
     block_index: u32,
     block: &mut [u8],
-) -> Result<usize> {
+) -> anyhow::Result<usize> {
     file.seek(SeekFrom::Start(
         (block_index * MAX_CHUNK_SIZE as u32).into(),
     ))?;
@@ -272,7 +272,7 @@ pub fn read_block_from_complete_file(
 /// * [`BitVec`](https://docs.rs/bit-vec/0.6.3/bit_vec/struct.BitVec.html)
 /// * [`Msb0`](https://docs.rs/bit-vec/0.6.3/bit_vec/struct.Msb0.html)
 /// ```
-pub fn get_file_metadata(path: &PathBuf) -> Result<FileMeta> {
+pub fn get_file_metadata(path: &PathBuf) -> anyhow::Result<FileMeta> {
     let meta = path.metadata().expect("Failed to get file metadata");
     let name = path
         .file_name()
@@ -335,32 +335,54 @@ pub fn read_file(
     block_buf: &mut [u8],
 ) -> anyhow::Result<usize> {
     dbg!(&file_name);
-    let mut file = File::open(FOLDER_PATH.to_string() + file_name).unwrap();
-    let file_size = file.metadata().unwrap().len();
-    let n_blocks = (file_size as f64 / MAX_CHUNK_SIZE as f64).ceil() as u32;
-    let block_size = if block_index == n_blocks - 1 {
-        file_size as u32 % n_blocks as u32
-    } else {
-        MAX_CHUNK_SIZE as u32
-    };
-    dbg!(&file_size, &block_size, &n_blocks);
+    let mut _b_read = Ok(0);
+    if let Ok(mut file) = File::open(FOLDER_PATH.to_string() + file_name) {
+        let file_size = file.metadata().unwrap().len();
+        let n_blocks = (file_size as f64 / MAX_CHUNK_SIZE as f64).ceil() as u32;
+        let block_size = if block_index == n_blocks - 1 {
+            file_size as u32 % n_blocks as u32
+        } else {
+            MAX_CHUNK_SIZE as u32
+        };
+        dbg!(&file_size, &block_size, &n_blocks);
 
-    if file_name.ends_with(".part") {
-        read_block_from_part_file(
+        if file_name.ends_with(".part") {
+            _b_read = read_block_from_part_file(
+                &mut file,
+                n_blocks,
+                block_size,
+                block_index,
+                block_buf,
+            )
+        } else {
+            _b_read = read_block_from_complete_file(
+                &mut file,
+                block_size,
+                block_index,
+                block_buf,
+            )
+        }
+    } else {
+        let mut file =
+            File::open(FOLDER_PATH.to_string() + file_name + ".part").unwrap();
+        let file_size = file.metadata().unwrap().len();
+        let n_blocks = (file_size as f64 / MAX_CHUNK_SIZE as f64).ceil() as u32;
+        let block_size = if block_index == n_blocks - 1 {
+            file_size as u32 % n_blocks as u32
+        } else {
+            MAX_CHUNK_SIZE as u32
+        };
+        dbg!(&file_size, &block_size, &n_blocks);
+
+        _b_read = read_block_from_part_file(
             &mut file,
             n_blocks,
             block_size,
             block_index,
             block_buf,
         )
-    } else {
-        read_block_from_complete_file(
-            &mut file,
-            block_size,
-            block_index,
-            block_buf,
-        )
     }
+    _b_read
 }
 
 #[cfg(test)]
