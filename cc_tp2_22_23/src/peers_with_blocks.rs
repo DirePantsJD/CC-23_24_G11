@@ -1,6 +1,8 @@
 use std::collections::{HashMap, HashSet};
 use std::net::{IpAddr, Ipv4Addr};
 
+use crate::fsnp::MAX_CHUNK_SIZE;
+
 #[derive(Debug)]
 pub struct PeersWithFile {
     pub file_size: u32,
@@ -29,11 +31,11 @@ impl PeersWithFile {
             Self::bin_p_w_f(self.peers_with_file, &mut p_w_f_buf);
 
         let mut p_w_b_buf = [0u8; 1000];
-        let p_w_b_buf_size = Self::bin_p_w_b(
-            self.peers_with_blocks,
-            &mut p_w_b_buf,
-            self.n_blocks,
-        );
+
+        let n_blocks =
+            (self.file_size as f64 / MAX_CHUNK_SIZE as f64).ceil() as u32;
+        let p_w_b_buf_size =
+            Self::bin_p_w_b(self.peers_with_blocks, &mut p_w_b_buf, n_blocks);
         dbg!(&p_w_b_buf[..p_w_b_buf_size]);
 
         if p_w_f_len != 0 {
