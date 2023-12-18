@@ -165,6 +165,7 @@ fn stop_wait(
                 };
                 thread_socket.set_read_timeout(Some(timeout))?;
             } else {
+                println!("\nNO PEER\n");
                 return Ok((next_chunk_id, false));
             }
             fetch_peer = false;
@@ -218,6 +219,7 @@ fn stop_wait(
                                 update_tracker_chunks(
                                     &packet, &filename, &tracker,
                                 )?;
+                                println!("\nBLOCK WRITTEN\n");
                                 return Ok((next_chunk_id, true));
                             } else {
                                 resend = true;
@@ -247,6 +249,7 @@ fn stop_wait(
                         }
                         //Handle other errors
                         _ => {
+                            dbg!(&e);
                             return Ok((next_chunk_id, false));
                         }
                     }
