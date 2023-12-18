@@ -237,7 +237,7 @@ fn stop_wait(
                 // socket receive timeout => retry mechanism
                 Err(e) => {
                     match e.kind() {
-                        ErrorKind::TimedOut => {
+                        ErrorKind::TimedOut | ErrorKind::WouldBlock => {
                             if retries == 3 {
                                 retries = 0;
                                 fetch_peer = true;
