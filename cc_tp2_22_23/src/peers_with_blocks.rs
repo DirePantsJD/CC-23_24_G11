@@ -78,7 +78,7 @@ impl PeersWithFile {
         for b_id in 0..n_blocks {
             if let Some(ips_set) = p_w_b.get(&b_id) {
                 buf[offset..offset + 4]
-                    .copy_from_slice(&ips_set.len().to_be_bytes());
+                    .copy_from_slice(&(ips_set.len() as u32).to_be_bytes());
                 offset += 4;
                 for ip in ips_set {
                     match ip {
