@@ -188,6 +188,7 @@ fn stop_wait(
                     {
                         println!("vvv FSNP IN vvv \n{:?}", packet.to_string());
                         if packet.chunk_id == next_chunk_id {
+                            println!("chunkkk:{}", packet.chunk_id);
                             let duration = current_rtt.elapsed().as_millis();
                             if let Ok(_) = write_block(
                                 file,
