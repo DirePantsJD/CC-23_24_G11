@@ -199,18 +199,6 @@ fn get_files_meta() -> Vec<FileMeta> {
         let path = entry.path();
 
         if path.is_file() {
-            // && let Ok(meta) = entry.metadata()
-            // && let Some(name) = path.file_name().and_then(|os_str| os_str.to_str())
-            // {
-            //     let f_size = meta.len();
-            //     let f_m = FileMeta {
-            //         f_size,
-            //         has_full_file: true,
-            //         blocks_len: 0,
-            //         name_len: name.len() as u16,
-            //         blocks: BitVec::<u8,Msb0>::new(),
-            //         name:name.to_string()
-            //     };
             let f_m = get_file_metadata(&path).unwrap();
             files_meta.push(f_m);
         }

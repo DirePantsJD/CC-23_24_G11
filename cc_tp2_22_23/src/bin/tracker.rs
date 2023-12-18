@@ -143,7 +143,7 @@ fn add(
                         );
                     } else {
                         let val = file_to_ips.get_mut(&file_name).unwrap();
-                        if !val.iter().any(|(i, _)| i == &ip) {
+                        if !val.iter().all(|(i, _)| i != &ip) {
                             val.push((ip, file_meta));
                         }
                     }
@@ -151,8 +151,8 @@ fn add(
             }
         }
     }
-    // println!("{:?}", tracking_lock);
-    // println!("{:?}", file_to_ips_lock);
+    println!("{:?}", tracking_lock);
+    println!("{:?}", file_to_ips_lock);
 }
 
 fn add_block(
