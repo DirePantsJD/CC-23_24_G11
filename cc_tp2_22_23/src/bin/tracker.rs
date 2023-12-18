@@ -245,7 +245,7 @@ fn file(
             } else {
                 for (b_id, &val) in meta.blocks.iter().enumerate() {
                     let b_id = b_id as u32;
-                    if val == 1 {
+                    if val == b'1' {
                         if let Some(addrs) = peers_with_blocks.get_mut(&b_id) {
                             addrs.insert(ip);
                         } else {
