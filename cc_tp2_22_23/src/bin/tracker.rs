@@ -224,10 +224,12 @@ fn file(
     if let Some(data) = msg.data {
         let file_name = from_utf8(data).unwrap().trim_end();
         println!("Requested file: {}", file_name);
+        println!("{:?}", file_to_ips_lock);
 
         let mut ips = vec![];
         let mut peers_with_file = HashSet::new();
-        let mut peers_with_blocks = HashMap::new();
+        let mut peers_with_blocks: HashMap<u32, HashSet<IpAddr>> =
+            HashMap::new();
         if let Ok(file_to_ips) = file_to_ips_lock.read() {
             ips = file_to_ips.get(file_name).unwrap().clone();
             file_size = ips[0].1.f_size as u32;
@@ -241,10 +243,12 @@ fn file(
             if meta.has_full_file {
                 peers_with_file.insert(ip);
             } else {
-                for (b_id, val) in meta.blocks.iter().enumerate() {
+                for (b_id, &val) in meta.blocks.iter().enumerate() {
                     let b_id = b_id as u32;
-                    if *val == 1 {
-                        if let None = peers_with_blocks.get(&b_id) {
+                    if val == 1 {
+                        if let Some(addrs) = peers_with_blocks.get_mut(&b_id) {
+                            addrs.insert(ip);
+                        } else {
                             let mut addrs = HashSet::new();
                             addrs.insert(ip);
                             peers_with_blocks.insert(b_id, addrs);
