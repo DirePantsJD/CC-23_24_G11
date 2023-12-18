@@ -179,7 +179,7 @@ fn stop_wait(
             );
             current_rtt = Instant::now();
         }
-        dbg!(&peer_ip, thread::current().id());
+        dbg!(&peer_ip, &next_chunk_id, thread::current().id());
 
         if let Ok(()) = request {
             match thread_socket.recv_from(&mut reply) {
