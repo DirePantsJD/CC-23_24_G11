@@ -23,6 +23,7 @@ impl FileMeta {
         let b_name_len = self.name_len.to_be_bytes();
         let mut b_blocks_buff = [0u8; 1000];
         self.blocks.clone().read(&mut b_blocks_buff)?;
+        dbg!(&blocks_len, &b_blocks_buff[..blocks_len]);
         let b_name = self.name.as_bytes();
 
         buf[..8].copy_from_slice(&b_f_size);
