@@ -42,8 +42,11 @@ impl FileMeta {
         blocks.write(&bytes[15..15 + blocks_len as usize])?;
         println!("bl:{},nl:{}", blocks_len, name_len);
         let name = String::from(
-            from_utf8(&bytes[15..15 + blocks_len as usize + name_len as usize])
-                .unwrap(),
+            from_utf8(
+                &bytes[15 + blocks_len as usize
+                    ..15 + blocks_len as usize + name_len as usize],
+            )
+            .unwrap(),
         );
         let fm = FileMeta {
             f_size,
