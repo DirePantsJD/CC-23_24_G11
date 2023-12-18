@@ -315,7 +315,7 @@ pub fn get_file_metadata(path: &PathBuf) -> Result<FileMeta> {
             f_size: meta.len() - (n_blocks as u64 + size_of::<u32>() as u64),
             has_full_file: false,
             blocks_len: n_blocks,
-            name_len: name.len() as u16,
+            name_len: trunc_name.len() as u16,
             blocks: byte_vec.to_owned(),
             name: trunc_name,
         })
