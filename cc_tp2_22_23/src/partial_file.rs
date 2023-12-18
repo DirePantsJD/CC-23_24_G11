@@ -318,6 +318,8 @@ pub fn get_file_metadata(path: &PathBuf) -> Result<FileMeta> {
             }
         }
 
+        dbg!(&bit_vec);
+
         Ok(FileMeta {
             f_size: meta.len() - (n_blocks as u64 + size_of::<u32>() as u64),
             has_full_file: false,
