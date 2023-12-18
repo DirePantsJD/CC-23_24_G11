@@ -309,24 +309,15 @@ pub fn get_file_metadata(path: &PathBuf) -> Result<FileMeta> {
 
         let mut byte_vec = vec![0; n_blocks as usize];
         file.read_exact(&mut byte_vec).expect("Failed to read");
-        // let mut blocks = BitVec::new();
-        // for byte in bit_vec.iter_mut() {
-        //     if byte == &b'1' {
-        //         blocks.push(true);
-        //     } else {
-        //         blocks.push(false);
-        //     }
-        // }
-
-        // dbg!(&bit_vec);
-
+        let mut trunc_name = name.to_string();
+        trunc_name.truncate(name.len() - 5);
         Ok(FileMeta {
             f_size: meta.len() - (n_blocks as u64 + size_of::<u32>() as u64),
             has_full_file: false,
             blocks_len: n_blocks,
             name_len: name.len() as u16,
             blocks: byte_vec.to_owned(),
-            name: name.to_string(),
+            name: trunc_name,
         })
     } else {
         Ok(FileMeta {
