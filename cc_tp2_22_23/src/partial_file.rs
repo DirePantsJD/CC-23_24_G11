@@ -1,6 +1,4 @@
 use anyhow::{bail, Context, Ok, Result};
-use bitvec::order::Msb0;
-use bitvec::vec::BitVec;
 use std::fs::File;
 use std::fs::{self, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};

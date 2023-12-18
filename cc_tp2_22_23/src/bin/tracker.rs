@@ -270,11 +270,7 @@ fn file(
         let mut p_w_f_buf = [0u8; 1400];
         let size_p_w_f = peers_with_file.to_bytes(&mut p_w_f_buf);
 
-        println!(
-            "bytes:{:?}\n {:?}",
-            &p_w_f_buf[..size_p_w_f as usize],
-            size_p_w_f
-        );
+        dbg!(&p_w_f_buf, &size_p_w_f);
 
         let resp = FstpMessage {
             header: FstpHeader {
