@@ -143,7 +143,7 @@ fn add(
                         );
                     } else {
                         let val = file_to_ips.get_mut(&file_name).unwrap();
-                        if !val.iter().all(|(i, _)| i != &ip) {
+                        if val.iter().all(|(i, _)| i != &ip) {
                             val.push((ip, file_meta));
                         }
                     }
