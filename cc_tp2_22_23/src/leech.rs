@@ -184,7 +184,7 @@ fn stop_wait(
 
         if let Ok(()) = request {
             match thread_socket.recv_from(&mut reply) {
-                Ok((len, _)) => {
+                Ok((len, sauce)) => {
                     if let Ok(packet) =
                         Protocol::read_packet(&reply, len as u16)
                     {
@@ -211,7 +211,7 @@ fn stop_wait(
                                 {
                                     update_peer_latency(
                                         duration as u16,
-                                        &peer_ip,
+                                        &sauce.ip(),
                                         data_rwl,
                                     );
                                 }
