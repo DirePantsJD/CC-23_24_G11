@@ -318,17 +318,12 @@ pub fn download_file(
         t.join().unwrap();
     }
 
-    if let Ok(failed_chunks) = failed_chunks.read() {
-        if failed_chunks.is_empty() {
-            complete_part_file(
-                (filename + ".part").as_str(),
-                file_size,
-                nblocks as u32,
-            )
-            .unwrap();
-        } else {
-            println!("Could no get {} blocks", failed_chunks.len());
-        }
+    if let Err(_) = complete_part_file(
+        (filename + ".part").as_str(),
+        file_size,
+        nblocks as u32,
+    ) {
+        println!("Failed to download blocks");
     };
 }
 
