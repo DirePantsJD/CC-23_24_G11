@@ -238,7 +238,7 @@ fn stop_wait(
                 Err(e) => {
                     match e.kind() {
                         ErrorKind::TimedOut | ErrorKind::WouldBlock => {
-                            if retries == 3 {
+                            if retries == 10 {
                                 retries = 0;
                                 fetch_peer = true;
                                 picked.insert(peer_ip);
