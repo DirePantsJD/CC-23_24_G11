@@ -1,1 +1,6 @@
-# CC-23_24_G11
+## Pratical assignemt for Computer Comunications course (23/24)
+
+# BitTorrent implementation in Rust for CoreEmu
+
+
+
